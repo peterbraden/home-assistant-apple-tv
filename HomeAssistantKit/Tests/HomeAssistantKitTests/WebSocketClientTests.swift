@@ -11,6 +11,7 @@ private final class FakeHomeAssistant: @unchecked Sendable {
     private let listener: NWListener
     private let queue = DispatchQueue(label: "FakeHomeAssistant")
     private var connections: [NWConnection] = []
+    private var lastID = 0
 
     init() throws {
         let parameters = NWParameters.tcp
@@ -65,6 +66,18 @@ private final class FakeHomeAssistant: @unchecked Sendable {
         let id = message["id"] ?? .null
         func result(_ value: JSONValue) {
             send(["id": id, "type": "result", "success": true, "result": value], on: connection)
+        }
+
+        // Like Home Assistant, reject message IDs that don't increase.
+        if let number = id.intValue {
+            guard number > lastID else {
+                send([
+                    "id": id, "type": "result", "success": false,
+                    "error": ["code": "id_reuse", "message": "Identifier values have to increase."],
+                ], on: connection)
+                return
+            }
+            lastID = number
         }
 
         switch message["type"]?.stringValue {
@@ -148,6 +161,29 @@ private final class FakeHomeAssistant: @unchecked Sendable {
 
         await client.close()
         #expect(await iterator.next() == nil)
+    }
+
+    @Test func sendsConcurrentCommandsInIDOrder() async throws {
+        let (server, url) = try await makeServer()
+        defer { server.stop() }
+
+        let client = HAWebSocketClient(config: HAServerConfig(baseURL: url, accessToken: FakeHomeAssistant.token))
+        try await client.connect()
+        for _ in 0..<5 {
+            try await withThrowingTaskGroup(of: Int.self) { group in
+                // Mixed priorities, like SwiftUI `.task`s from different cards:
+                // the actor may run higher-priority work first.
+                for index in 0..<200 {
+                    group.addTask(priority: index.isMultiple(of: 2) ? .background : .high) {
+                        try await client.fetchStates().count
+                    }
+                }
+                for try await count in group {
+                    #expect(count == 2)
+                }
+            }
+        }
+        await client.close()
     }
 
     @Test func rejectsBadToken() async throws {

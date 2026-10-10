@@ -18,6 +18,11 @@ import Testing
         #expect(value == [.number(0), .number(1)])
     }
 
+    @Test func fastParserMatchesCodable() throws {
+        let json = Data(#"{"a": true, "b": 1.5, "c": "x", "d": [1, 0, null, false], "e": {"f": 2}}"#.utf8)
+        #expect(try JSONValue(jsonData: json) == JSONDecoder().decode(JSONValue.self, from: json))
+    }
+
     @Test func roundTrips() throws {
         let value: JSONValue = ["entity_id": "light.kitchen", "brightness_pct": 50, "on": true]
         let decoded = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))

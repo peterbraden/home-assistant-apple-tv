@@ -63,7 +63,9 @@ struct LovelaceViewContent: View {
         case .sections:
             VStack(alignment: .leading, spacing: 40) {
                 ForEach(view.sections) { section in
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
+                    // Sections spanning several columns use the full width.
+                    LazyVGrid(columns: section.columnSpan > 1 ? [GridItem(.flexible())] : columns,
+                              alignment: .leading, spacing: 40) {
                         ForEach(section.cards) { card in
                             LovelaceCardView(card: card)
                         }

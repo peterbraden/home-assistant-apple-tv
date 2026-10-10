@@ -61,50 +61,61 @@ final class ScreenshotTourTests: XCTestCase {
         sleep(2)
         try XCTSkipUnless(focusedTabName(in: tabBar) == "Dashboards", "No Dashboards tab")
 
-        // Move down from the tab bar until a view button has focus (only moving focus).
-        for _ in 0..<3 where focusedElement(in: app).identifier != "dashboard-view-button" {
-            remote.press(.down)
-            sleep(1)
-        }
-
-        var previous = ""
-        for index in 0..<12 {
-            if index > 0 {
-                remote.press(.right)
+        // Only focus moves from here on, except the guarded select below.
+        let viewButton = "dashboard-view-button"
+        func moveFocus(_ button: XCUIRemote.Button, until done: () -> Bool, maxPresses: Int = 6) {
+            for _ in 0..<maxPresses where !done() {
+                remote.press(button)
                 sleep(1)
             }
+        }
+        moveFocus(.down) { focusedElement(in: app).identifier == viewButton }
+        let titles = app.buttons.matching(identifier: viewButton).allElementsBoundByIndex.map(\.label)
+            .map { $0.replacingOccurrences(of: "Selected, ", with: "") }
+        XCTAssertFalse(titles.isEmpty, "No dashboard view buttons found")
+
+        for (index, title) in titles.enumerated() {
+            // Steer left/right along the view row until the wanted button has focus.
+            for _ in 0..<titles.count {
+                let current = focusedElement(in: app)
+                guard current.identifier == viewButton,
+                      let position = titles.firstIndex(where: { current.label.hasSuffix($0) })
+                else { break }
+                if position == index { break }
+                remote.press(position < index ? .right : .left)
+                sleep(1)
+            }
+
             let focused = focusedElement(in: app)
-            let label = focused.label
-            if label == previous { break }
-            previous = label
             // Never press select unless a dashboard view button has focus:
             // anything else could switch a real device.
-            guard focused.exists, focused.identifier == "dashboard-view-button" else {
-                XCTFail("Expected a dashboard view button to have focus, found “\(label)”; not pressing select")
+            guard focused.exists, focused.identifier == viewButton, focused.label.hasSuffix(title) else {
+                XCTFail("Expected the “\(title)” view button to have focus, found “\(focused.label)”; not pressing select")
                 return
             }
             remote.press(.select)
             sleep(8)
-            let name = label.replacingOccurrences(of: " ", with: "_")
+            let name = title.replacingOccurrences(of: " ", with: "_")
             save("dash-\(index)-\(name)")
             remote.press(.down)
             sleep(1)
             remote.press(.down)
             sleep(2)
             save("dash-\(index)-\(name)-scrolled")
-            remote.press(.up)
-            sleep(1)
-            remote.press(.up)
-            sleep(1)
-            if focusedElement(in: app).identifier != "dashboard-view-button" {
-                XCTFail("Lost track of the view buttons (focus on “\(focusedElement(in: app).label)”)")
+
+            moveFocus(.up) { focusedElement(in: app).identifier == viewButton }
+            guard focusedElement(in: app).identifier == viewButton else {
+                XCTFail("Couldn't get back to the view buttons")
                 return
             }
         }
     }
 
-    private func focusedElement(in app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: "hasFocus == true")).firstMatch
+    /// The focused element's label and identifier; empty when nothing has focus.
+    private func focusedElement(in app: XCUIApplication) -> (exists: Bool, label: String, identifier: String) {
+        let element = app.descendants(matching: .any).matching(NSPredicate(format: "hasFocus == true")).firstMatch
+        guard element.exists else { return (false, "", "") }
+        return (true, element.label, element.identifier)
     }
 
     private func focusedTabName(in tabBar: XCUIElement) -> String {

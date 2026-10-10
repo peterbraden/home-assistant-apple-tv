@@ -63,6 +63,15 @@ private struct TimelineSegment: Identifiable {
     var id: String { "\(row)-\(start.timeIntervalSince1970)" }
 }
 
+/// History reduced to what the charts draw, prepared once per load.
+private struct PreparedHistory {
+    var lineCharts: [(unit: String, points: [LinePoint])]
+    var timeline: [TimelineSegment]
+    var timelineRows: Int
+    var start: Date
+    var end: Date
+}
+
 /// The `history-graph` card: a line chart per unit for numeric entities and a
 /// timeline for everything else, as in Home Assistant.
 struct HistoryGraphCard: View {
@@ -70,61 +79,50 @@ struct HistoryGraphCard: View {
     let chartHeight: CGFloat
 
     @Environment(HomeStore.self) private var store
-    @State private var history: [String: [HAHistoryPoint]]?
+    @State private var prepared: PreparedHistory?
     @State private var error: String?
-    @State private var loadedAt = Date()
 
     private var hours: Double { card.double("hours_to_show") ?? 24 }
 
     var body: some View {
         CardContainer(title: card.title) {
-            LoadingState(value: history, error: error, height: chartHeight) { history in
-                charts(history)
+            LoadingState(value: prepared, error: error, height: chartHeight) { prepared in
+                charts(prepared)
             }
         }
         .reload(every: .seconds(max(card.double("refresh_interval") ?? 60, 30))) { await load() }
     }
 
     private func load() async {
-        let now = Date()
+        let end = Date()
+        let start = end.addingTimeInterval(-hours * 3600)
         do {
-            history = try await store.history(
-                for: card.entities.map(\.entityId), since: now.addingTimeInterval(-hours * 3600))
-            loadedAt = now
+            let history = try await store.history(for: card.entities.map(\.entityId), since: start)
+            prepared = prepare(history, start: start, end: end)
             error = nil
         } catch {
-            if history == nil { self.error = error.localizedDescription }
+            if prepared == nil { self.error = error.localizedDescription }
         }
     }
 
     @ViewBuilder
-    private func charts(_ history: [String: [HAHistoryPoint]]) -> some View {
-        let start = loadedAt.addingTimeInterval(-hours * 3600)
-        let refs = card.entities
-        let numeric = refs.filter { store.entity($0.entityId)?.unit != nil }
-        let timeline = refs.filter { store.entity($0.entityId)?.unit == nil }
-        let units = numeric.compactMap { store.entity($0.entityId)?.unit }.uniqued()
-
+    private func charts(_ prepared: PreparedHistory) -> some View {
         VStack(alignment: .leading, spacing: 40) {
-            ForEach(units, id: \.self) { unit in
-                let points = numeric
-                    .filter { store.entity($0.entityId)?.unit == unit }
-                    .flatMap { linePoints(for: $0, history: history, until: loadedAt) }
-                Chart(points) { point in
-                    LineMark(x: .value("Time", point.time), y: .value(unit, point.value))
+            ForEach(prepared.lineCharts, id: \.unit) { chart in
+                Chart(chart.points) { point in
+                    LineMark(x: .value("Time", point.time), y: .value(chart.unit, point.value))
                         .foregroundStyle(by: .value("Entity", point.series))
                         .interpolationMethod(.stepEnd)
                 }
-                .chartXScale(domain: start...loadedAt)
+                .chartXScale(domain: prepared.start...prepared.end)
                 .chartYScale(domain: .automatic(includesZero: false))
-                .chartYAxisLabel(unit)
+                .chartYAxisLabel(chart.unit)
                 .chartLegend(position: .bottom, alignment: .leading)
                 .frame(height: chartHeight)
             }
 
-            if !timeline.isEmpty {
-                let bars = timeline.flatMap { segments(for: $0, history: history, from: start, until: loadedAt) }
-                Chart(bars) { segment in
+            if !prepared.timeline.isEmpty {
+                Chart(prepared.timeline) { segment in
                     BarMark(
                         xStart: .value("Start", segment.start),
                         xEnd: .value("End", segment.end),
@@ -132,39 +130,61 @@ struct HistoryGraphCard: View {
                     )
                     .foregroundStyle(by: .value("State", segment.state))
                 }
-                .chartXScale(domain: start...loadedAt)
+                .chartXScale(domain: prepared.start...prepared.end)
                 .chartLegend(position: .bottom, alignment: .leading)
-                .frame(height: CGFloat(timeline.count) * 70 + 80)
+                .frame(height: CGFloat(prepared.timelineRows) * 70 + 80)
+            }
+
+            if prepared.lineCharts.isEmpty && prepared.timeline.isEmpty {
+                Text("No history recorded for these entities.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: chartHeight / 2)
             }
         }
     }
 
+    private func prepare(_ history: [String: [HAHistoryPoint]], start: Date, end: Date) -> PreparedHistory {
+        // Like Home Assistant: entities with a unit are plotted as lines, grouped by unit.
+        let refs = card.entities.filter { !(history[$0.entityId] ?? []).isEmpty }
+        let numeric = refs.filter { store.entity($0.entityId)?.unit != nil }
+        let textual = refs.filter { store.entity($0.entityId)?.unit == nil }
+
+        var units: [String] = []
+        var pointsByUnit: [String: [LinePoint]] = [:]
+        for ref in numeric {
+            guard let unit = store.entity(ref.entityId)?.unit else { continue }
+            if pointsByUnit[unit] == nil { units.append(unit) }
+            let series = name(of: ref)
+            var points = HADownsampler.numeric(history[ref.entityId] ?? [], maxCount: maxPointsPerSeries)
+                .map { LinePoint(series: series, time: max($0.time, start), value: $0.value) }
+            // Carry the latest value to "now" so lines reach the right edge.
+            if let last = points.last {
+                points.append(LinePoint(series: series, time: end, value: last.value))
+            }
+            pointsByUnit[unit, default: []] += points
+        }
+
+        let timeline = textual.flatMap { ref -> [TimelineSegment] in
+            let row = name(of: ref)
+            let points = history[ref.entityId] ?? []
+            return points.enumerated().map { index, point in
+                let next = index + 1 < points.count ? points[index + 1].time : end
+                return TimelineSegment(row: row, state: humanize(point.state), start: max(point.time, start), end: next)
+            }
+        }
+
+        return PreparedHistory(
+            lineCharts: units.map { ($0, pointsByUnit[$0] ?? []) },
+            timeline: timeline,
+            timelineRows: textual.count,
+            start: start,
+            end: end
+        )
+    }
+
     private func name(of ref: LovelaceEntityRef) -> String {
         if let name = ref.name { return name }
-        guard let entity = store.entity(ref.entityId) else { return ref.entityId }
-        return entity.friendlyName
-    }
-
-    private func linePoints(for ref: LovelaceEntityRef, history: [String: [HAHistoryPoint]], until end: Date) -> [LinePoint] {
-        let series = name(of: ref)
-        var points = HADownsampler.numeric(history[ref.entityId] ?? [], maxCount: maxPointsPerSeries)
-            .map { LinePoint(series: series, time: $0.time, value: $0.value) }
-        // Carry the latest value to "now" so lines reach the right edge.
-        if let last = points.last {
-            points.append(LinePoint(series: series, time: end, value: last.value))
-        }
-        return points
-    }
-
-    private func segments(
-        for ref: LovelaceEntityRef, history: [String: [HAHistoryPoint]], from start: Date, until end: Date
-    ) -> [TimelineSegment] {
-        let row = name(of: ref)
-        let points = history[ref.entityId] ?? []
-        return points.enumerated().map { index, point in
-            let next = index + 1 < points.count ? points[index + 1].time : end
-            return TimelineSegment(row: row, state: humanize(point.state), start: max(point.time, start), end: next)
-        }
+        return store.entity(ref.entityId)?.friendlyName ?? ref.entityId
     }
 }
 
@@ -264,6 +284,8 @@ struct StatisticsGraphCard: View {
                         .lineStyle(point.type == "mean" || types.count == 1
                             ? StrokeStyle(lineWidth: 3)
                             : StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                        // Min/max are context for the mean, so keep them in the background.
+                        .opacity(point.type == "mean" || types.count == 1 ? 1 : 0.45)
                     }
                 }
             }
@@ -386,9 +408,3 @@ private func unitSpacing(_ unit: String) -> String {
     unit == "%" || unit.hasPrefix("°") ? "" : " "
 }
 
-private extension Array where Element: Hashable {
-    func uniqued() -> [Element] {
-        var seen = Set<Element>()
-        return filter { seen.insert($0).inserted }
-    }
-}

@@ -39,6 +39,32 @@ public enum JSONValue: Codable, Hashable, Sendable {
         }
     }
 
+    /// Parses JSON with `JSONSerialization`, which is much faster than `Codable`
+    /// for large payloads such as history.
+    public init(jsonData: Data) throws {
+        self.init(any: try JSONSerialization.jsonObject(with: jsonData, options: [.fragmentsAllowed]))
+    }
+
+    init(any value: Any) {
+        switch value {
+        case let number as NSNumber:
+            // JSONSerialization represents booleans as CFBoolean-backed NSNumbers.
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                self = .bool(number.boolValue)
+            } else {
+                self = .number(number.doubleValue)
+            }
+        case let string as String:
+            self = .string(string)
+        case let array as [Any]:
+            self = .array(array.map(JSONValue.init(any:)))
+        case let object as [String: Any]:
+            self = .object(object.mapValues(JSONValue.init(any:)))
+        default:
+            self = .null
+        }
+    }
+
     public var stringValue: String? {
         if case .string(let value) = self { return value }
         return nil

@@ -38,6 +38,9 @@ public actor HAWebSocketClient {
     private var pending: [Int: CheckedContinuation<JSONValue, Error>] = [:]
     private var stateSubscriptionID: Int?
     private var isClosed = false
+    /// The most recent outgoing send. Each send waits for the previous one so
+    /// messages leave in ID order; Home Assistant rejects IDs that go backwards.
+    private var lastSend: Task<Void, Never>?
 
     public init(config: HAServerConfig, session: URLSession = .shared) {
         self.config = config
@@ -100,7 +103,9 @@ public actor HAWebSocketClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             pending[id] = continuation
-            Task {
+            let previous = lastSend
+            lastSend = Task {
+                await previous?.value
                 do {
                     try await self.send(payload, on: task)
                 } catch {
@@ -249,6 +254,6 @@ public actor HAWebSocketClient {
         case .data(let bytes): data = bytes
         @unknown default: throw HAError.invalidResponse
         }
-        return try JSONDecoder().decode(JSONValue.self, from: data)
+        return try JSONValue(jsonData: data)
     }
 }

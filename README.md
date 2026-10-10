@@ -5,6 +5,7 @@ A native tvOS app (SwiftUI, tvOS 17+) for controlling Home Assistant from the co
 ## Features
 
 - **Rooms tab** – every controllable entity grouped by Home Assistant area.
+- **Dashboards tab** – your Lovelace dashboards drawn natively (tvOS has no web view), including history graphs, statistics graphs, statistic and sensor cards, entity lists, cameras and markdown. Card types not yet supported show a placeholder; auto-generated and strategy dashboards (e.g. Map) are skipped.
 - **Category tabs** – Lights, Climate, Media, Cameras, Security, Scenes and Sensors, shown only when you have matching entities.
 - **Live updates** over the WebSocket API, with automatic reconnect.
 - **One-click actions** – clicking a tile toggles lights/switches/fans or runs scenes, scripts and buttons. Long-press any tile for details.

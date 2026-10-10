@@ -127,7 +127,7 @@ private struct EntityRow: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(entity.tint)
                     .frame(width: 50)
-                Text(name ?? store.registry.name(for: entity).name)
+                Text(name ?? entity.friendlyName)
                     .lineLimit(1)
                 Spacer()
                 Text(entity.displayState)
