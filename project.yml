@@ -41,7 +41,7 @@ targets:
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "3"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: DCVZRG49FW
 
   HomeAssistantTVUITests:
     type: bundle.ui-testing
