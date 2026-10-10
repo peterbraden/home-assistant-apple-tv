@@ -32,10 +32,7 @@ struct EntityTile: View {
     }
 
     private func primaryAction() {
-        switch entity.primaryAction {
-        case .service(let domain, let service) where !entity.isUnavailable:
-            store.call(domain, service, on: entity)
-        default:
+        if !store.performPrimaryAction(on: entity) {
             showDetails()
         }
     }

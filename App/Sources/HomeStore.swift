@@ -18,6 +18,8 @@ final class HomeStore {
     private(set) var connectionState: ConnectionState = .signedOut
     private(set) var entities: [String: HAEntity] = [:]
     private(set) var registry: HARegistry = .empty
+    /// Dashboards with a stored layout. Auto-generated and strategy dashboards are left out.
+    private(set) var dashboards: [LoadedDashboard] = []
     private(set) var locationName = "Home"
     private(set) var serverVersion = ""
     /// A transient error from a service call, shown as a banner.
@@ -54,6 +56,7 @@ final class HomeStore {
         config = nil
         entities = [:]
         registry = .empty
+        dashboards = []
         connectionState = .signedOut
     }
 
@@ -83,10 +86,12 @@ final class HomeStore {
                 let states = try await socket.fetchStates()
                 // Registries are optional: they need an admin user.
                 let registry = (try? await socket.fetchRegistry()) ?? .empty
+                let dashboards = await loadDashboards(from: socket)
 
                 guard !Task.isCancelled else { await socket.close(); return }
                 self.entities = Dictionary(states.map { ($0.entityId, $0) }, uniquingKeysWith: { _, new in new })
                 self.registry = registry
+                self.dashboards = dashboards
                 self.socket = socket
                 connectionState = .connected
                 retryDelay = 2
@@ -117,6 +122,19 @@ final class HomeStore {
         }
     }
 
+    private func loadDashboards(from socket: HAWebSocketClient) async -> [LoadedDashboard] {
+        guard let list = try? await socket.fetchDashboards() else { return [] }
+        var loaded: [LoadedDashboard] = []
+        for dashboard in list {
+            // Fails with config_not_found for dashboards HA generates automatically.
+            guard let config = try? await socket.fetchDashboardConfig(urlPath: dashboard.urlPath),
+                  !config.isStrategy, !config.views.isEmpty
+            else { continue }
+            loaded.append(LoadedDashboard(dashboard: dashboard, config: config))
+        }
+        return loaded
+    }
+
     private func apply(_ change: HAStateChange) {
         if let newState = change.newState {
             entities[change.entityId] = newState
@@ -138,6 +156,36 @@ final class HomeStore {
         }
     }
 
+    /// Runs the entity's one-click action (toggle, run scene). Returns false when
+    /// it has none, in which case the caller should show details instead.
+    @discardableResult
+    func performPrimaryAction(on entity: HAEntity) -> Bool {
+        guard case .service(let domain, let service) = entity.primaryAction, !entity.isUnavailable else {
+            return false
+        }
+        call(domain, service, on: entity)
+        return true
+    }
+
+    // MARK: - History
+
+    func history(for entityIds: [String], since start: Date) async throws -> [String: [HAHistoryPoint]] {
+        guard let socket else { throw HAError.disconnected }
+        return try await socket.fetchHistory(entityIds: entityIds, start: start)
+    }
+
+    func statistics(
+        for ids: [String], since start: Date, period: String, types: [String]
+    ) async throws -> [String: [HAStatisticPoint]] {
+        guard let socket else { throw HAError.disconnected }
+        return try await socket.fetchStatistics(ids: ids, start: start, period: period, types: types)
+    }
+
+    func statistic(for id: String, period: JSONValue?, types: [String]) async throws -> [String: Double] {
+        guard let socket else { throw HAError.disconnected }
+        return try await socket.fetchStatistic(id: id, period: period, types: types)
+    }
+
     func cameraStreamURL(for entityId: String) async throws -> URL {
         guard let socket else { throw HAError.disconnected }
         return try await socket.cameraStreamURL(entityId: entityId)
@@ -157,10 +205,10 @@ final class HomeStore {
     }
 
     /// Categories to show as tabs. tvOS shows at most 7 tabs and silently drops
-    /// the rest, so Rooms, the categories and Settings must fit within that.
+    /// the rest, so Rooms, Dashboards, the categories and Settings must fit within that.
     var tabCategories: [EntityCategory] {
         var categories = availableCategories
-        let limit = 7 - 1 - (rooms.isEmpty ? 0 : 1)
+        let limit = 7 - 1 - (rooms.isEmpty ? 0 : 1) - (dashboards.isEmpty ? 0 : 1)
         if categories.count > limit, !rooms.isEmpty {
             // Scenes also appear in their rooms, so they're the first to go.
             categories.removeAll { $0 == .scenes }
@@ -193,6 +241,12 @@ final class HomeStore {
     func entity(_ id: String) -> HAEntity? {
         entities[id]
     }
+}
+
+struct LoadedDashboard: Identifiable {
+    let dashboard: HADashboard
+    let config: LovelaceConfig
+    var id: String { dashboard.id }
 }
 
 struct EntitySection: Identifiable {

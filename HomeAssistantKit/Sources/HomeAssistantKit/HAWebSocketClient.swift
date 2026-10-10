@@ -136,6 +136,55 @@ public actor HAWebSocketClient {
         )
     }
 
+    /// Lovelace dashboards visible to this user, default first.
+    public func fetchDashboards() async throws -> [HADashboard] {
+        HADashboard.fromPanels(try await send(command: "get_panels"))
+    }
+
+    /// The stored configuration of a dashboard. Throws `commandFailed("config_not_found")`
+    /// for dashboards that Home Assistant generates automatically.
+    public func fetchDashboardConfig(urlPath: String?) async throws -> LovelaceConfig {
+        var fields: [String: JSONValue] = [:]
+        if let urlPath { fields["url_path"] = .string(urlPath) }
+        return LovelaceConfig(try await send(command: "lovelace/config", fields))
+    }
+
+    public func fetchHistory(entityIds: [String], start: Date, end: Date? = nil) async throws -> [String: [HAHistoryPoint]] {
+        var fields: [String: JSONValue] = [
+            "start_time": .string(HAHistoryParser.isoString(start)),
+            "entity_ids": .array(entityIds.map { .string($0) }),
+            "minimal_response": true,
+            "no_attributes": true,
+            "significant_changes_only": false,
+        ]
+        if let end { fields["end_time"] = .string(HAHistoryParser.isoString(end)) }
+        return HAHistoryParser.history(try await send(command: "history/history_during_period", fields))
+    }
+
+    /// Long-term statistics, aggregated per `period` (`5minute`, `hour`, `day`, `week`, `month`).
+    public func fetchStatistics(
+        ids: [String], start: Date, end: Date? = nil, period: String, types: [String]
+    ) async throws -> [String: [HAStatisticPoint]] {
+        var fields: [String: JSONValue] = [
+            "start_time": .string(HAHistoryParser.isoString(start)),
+            "statistic_ids": .array(ids.map { .string($0) }),
+            "period": .string(period),
+            "types": .array(types.map { .string($0) }),
+        ]
+        if let end { fields["end_time"] = .string(HAHistoryParser.isoString(end)) }
+        return HAHistoryParser.statistics(try await send(command: "recorder/statistics_during_period", fields))
+    }
+
+    /// A single aggregate over a period, as shown by the `statistic` card.
+    /// `period` is the card's period object, e.g. `{"calendar": {"period": "year"}}`.
+    public func fetchStatistic(id: String, period: JSONValue?, types: [String]) async throws -> [String: Double] {
+        var fields = period?.objectValue ?? ["calendar": ["period": "day"]]
+        fields["statistic_id"] = .string(id)
+        fields["types"] = .array(types.map { .string($0) })
+        let result = try await send(command: "recorder/statistic_during_period", fields)
+        return (result.objectValue ?? [:]).compactMapValues(\.doubleValue)
+    }
+
     /// Requests an HLS stream for a camera. Requires the `stream` integration.
     public func cameraStreamURL(entityId: String) async throws -> URL {
         let result = try await send(command: "camera/stream", ["entity_id": .string(entityId)])

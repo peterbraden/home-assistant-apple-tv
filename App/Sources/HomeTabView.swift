@@ -14,6 +14,10 @@ struct HomeTabView: View {
                         SectionedGridView(sections: store.rooms)
                             .tabItem { Label("Rooms", systemImage: "house.fill") }
                     }
+                    if !store.dashboards.isEmpty {
+                        DashboardsView()
+                            .tabItem { Label("Dashboards", systemImage: "chart.xyaxis.line") }
+                    }
                     ForEach(store.tabCategories) { category in
                         SectionedGridView(sections: store.sections(for: store.entities(in: category)))
                             .tabItem { Label(category.title, systemImage: category.symbol) }
