@@ -24,10 +24,10 @@ struct HomeTabView: View {
                     AssistView()
                         .tabItem { Label("Assist", systemImage: "waveform") }
                         .tag(HomeStore.Tab.assist)
-                    ForEach(store.tabCategories) { category in
-                        SectionedGridView(sections: store.sections(for: store.entities(in: category)))
-                            .tabItem { Label(category.title, systemImage: category.symbol) }
-                            .tag(HomeStore.Tab.category(category))
+                    if !store.availableCategories.isEmpty {
+                        DevicesView()
+                            .tabItem { Label("Devices", systemImage: "square.grid.2x2.fill") }
+                            .tag(HomeStore.Tab.devices)
                     }
                     SettingsView()
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
@@ -91,6 +91,28 @@ private struct StatusBanner: View {
                 .background(.thinMaterial, in: Capsule())
                 .padding(.top, 20)
                 .allowsHitTesting(false)
+        }
+    }
+}
+
+/// Every entity by category, with a row of category buttons at the top.
+/// One tab for all categories keeps the tab bar within tvOS's limit of 7 tabs.
+private struct DevicesView: View {
+    @Environment(HomeStore.self) private var store
+
+    var body: some View {
+        let categories = store.availableCategories
+        let selected = categories.contains(store.selectedCategory) ? store.selectedCategory : categories.first
+        SectionedGridView(sections: selected.map { store.sections(for: store.entities(in: $0)) } ?? []) {
+            ControlRow(title: "Category") {
+                ForEach(categories) { category in
+                    OptionButton(title: category.title, systemImage: category.symbol, isSelected: category == selected) {
+                        store.selectedCategory = category
+                    }
+                    // Lets UI tests confirm focus is on a category button before pressing select.
+                    .accessibilityIdentifier("category-button")
+                }
+            }
         }
     }
 }

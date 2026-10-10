@@ -8,8 +8,7 @@ import TVServices
 @Observable
 final class HomeStore {
     enum Tab: Hashable {
-        case rooms, dashboards, assist, settings
-        case category(EntityCategory)
+        case rooms, dashboards, assist, devices, settings
     }
 
     enum ConnectionState: Equatable {
@@ -29,6 +28,8 @@ final class HomeStore {
     private(set) var locationName = "Home"
     private(set) var serverVersion = ""
     var selectedTab: Tab = .rooms
+    /// The category shown in the Devices tab.
+    var selectedCategory: EntityCategory = .lights
     /// A transient error from a service call, shown as a banner.
     var actionError: String?
 
@@ -111,7 +112,7 @@ final class HomeStore {
                 self.preferredAssistPipeline = pipelines?.preferred
                 if selectedTab == .rooms, rooms.isEmpty {
                     // Non-admin users have no Rooms tab.
-                    selectedTab = dashboards.isEmpty ? (tabCategories.first.map(Tab.category) ?? .settings) : .dashboards
+                    selectedTab = dashboards.isEmpty ? .devices : .dashboards
                 }
                 self.socket = socket
                 connectionState = .connected
@@ -278,18 +279,6 @@ final class HomeStore {
             return (rank(a.element), a.offset) < (rank(b.element), b.offset)
         }
         return ranked.prefix(40).map(\.element)
-    }
-
-    /// Categories to show as tabs. tvOS shows at most 7 tabs and silently drops the
-    /// rest, so Rooms, Dashboards, Assist, the categories and Settings must fit within that.
-    var tabCategories: [EntityCategory] {
-        var categories = availableCategories
-        let limit = 7 - 2 - (rooms.isEmpty ? 0 : 1) - (dashboards.isEmpty ? 0 : 1)
-        if categories.count > limit, !rooms.isEmpty {
-            // Scenes also appear in their rooms, so they're the first to go.
-            categories.removeAll { $0 == .scenes }
-        }
-        return Array(categories.prefix(limit))
     }
 
     func entities(in category: EntityCategory) -> [HAEntity] {
