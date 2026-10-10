@@ -45,6 +45,15 @@ Run the library tests (no Xcode needed):
 swift test --package-path HomeAssistantKit
 ```
 
+Screenshot every tab against a real server (UI test; it only moves focus, never operates devices):
+
+```sh
+TEST_RUNNER_HA_URL=http://homeassistant.local:8123 TEST_RUNNER_HA_TOKEN="$(pbpaste)" \
+TEST_RUNNER_SCREENSHOT_DIR=/tmp/ha-tour \
+  xcodebuild test -project HomeAssistantTV.xcodeproj -scheme HomeAssistantTV \
+  -destination 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation)'
+```
+
 ## Signing in
 
 1. In Home Assistant, open your **Profile → Security → Long-lived access tokens** and create a token.
