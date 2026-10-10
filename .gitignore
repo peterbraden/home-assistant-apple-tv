@@ -5,3 +5,5 @@ DerivedData/
 xcuserdata/
 *.xcodeproj/
 App/Info.plist
+TopShelf/Info.plist
+*.entitlements

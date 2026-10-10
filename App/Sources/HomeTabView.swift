@@ -5,25 +5,30 @@ struct HomeTabView: View {
     @Environment(HomeStore.self) private var store
 
     var body: some View {
+        @Bindable var store = store
         ZStack(alignment: .top) {
             if store.entities.isEmpty {
                 ConnectionStatusView()
             } else {
-                TabView {
+                TabView(selection: $store.selectedTab) {
                     if !store.rooms.isEmpty {
                         SectionedGridView(sections: store.rooms)
                             .tabItem { Label("Rooms", systemImage: "house.fill") }
+                            .tag(HomeStore.Tab.rooms)
                     }
                     if !store.dashboards.isEmpty {
                         DashboardsView()
                             .tabItem { Label("Dashboards", systemImage: "chart.xyaxis.line") }
+                            .tag(HomeStore.Tab.dashboards)
                     }
                     ForEach(store.tabCategories) { category in
                         SectionedGridView(sections: store.sections(for: store.entities(in: category)))
                             .tabItem { Label(category.title, systemImage: category.symbol) }
+                            .tag(HomeStore.Tab.category(category))
                     }
                     SettingsView()
                         .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                        .tag(HomeStore.Tab.settings)
                 }
             }
 

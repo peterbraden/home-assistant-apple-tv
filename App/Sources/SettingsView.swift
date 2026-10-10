@@ -1,8 +1,10 @@
 import HomeAssistantKit
 import SwiftUI
+import TVServices
 
 struct SettingsView: View {
     @Environment(HomeStore.self) private var store
+    @State private var topShelfView = SharedContainer.topShelfView ?? ""
 
     var body: some View {
         Form {
@@ -14,6 +16,23 @@ struct SettingsView: View {
                 }
                 LabeledContent("Status", value: statusText)
                 LabeledContent("Entities", value: "\(store.entities.count)")
+            }
+
+            if !store.topShelfChoices.isEmpty {
+                Section {
+                    Picker("Top Shelf", selection: $topShelfView) {
+                        Text("Automatic").tag("")
+                        ForEach(store.topShelfChoices, id: \.id) { choice in
+                            Text(choice.title).tag(choice.id)
+                        }
+                    }
+                    .onChange(of: topShelfView) { _, newValue in
+                        SharedContainer.topShelfView = newValue.isEmpty ? nil : newValue
+                        TVTopShelfContentProvider.topShelfContentDidChange()
+                    }
+                } footer: {
+                    Text("The dashboard graphs shown behind the app when it's in the top row of the Home screen.")
+                }
             }
 
             Section {

@@ -1,11 +1,17 @@
 import Foundation
 import HomeAssistantKit
 import Observation
+import TVServices
 
 /// App-wide state: the connection to Home Assistant and the live entity states.
 @MainActor
 @Observable
 final class HomeStore {
+    enum Tab: Hashable {
+        case rooms, dashboards, settings
+        case category(EntityCategory)
+    }
+
     enum ConnectionState: Equatable {
         case signedOut
         case connecting
@@ -22,6 +28,7 @@ final class HomeStore {
     private(set) var dashboards: [LoadedDashboard] = []
     private(set) var locationName = "Home"
     private(set) var serverVersion = ""
+    var selectedTab: Tab = .rooms
     /// A transient error from a service call, shown as a banner.
     var actionError: String?
 
@@ -45,6 +52,7 @@ final class HomeStore {
         CredentialStore.save(config)
         self.config = config
         connect()
+        TVTopShelfContentProvider.topShelfContentDidChange()
     }
 
     func signOut() {
@@ -58,6 +66,7 @@ final class HomeStore {
         registry = .empty
         dashboards = []
         connectionState = .signedOut
+        TVTopShelfContentProvider.topShelfContentDidChange()
     }
 
     /// Reconnects if the socket was dropped, e.g. after the app returns from the background.
@@ -92,6 +101,10 @@ final class HomeStore {
                 self.entities = Dictionary(states.map { ($0.entityId, $0) }, uniquingKeysWith: { _, new in new })
                 self.registry = registry
                 self.dashboards = dashboards
+                if selectedTab == .rooms, rooms.isEmpty {
+                    // Non-admin users have no Rooms tab.
+                    selectedTab = dashboards.isEmpty ? (tabCategories.first.map(Tab.category) ?? .settings) : .dashboards
+                }
                 self.socket = socket
                 connectionState = .connected
                 retryDelay = 2
@@ -189,6 +202,24 @@ final class HomeStore {
     func cameraStreamURL(for entityId: String) async throws -> URL {
         guard let socket else { throw HAError.disconnected }
         return try await socket.cameraStreamURL(entityId: entityId)
+    }
+
+    // MARK: - Top Shelf
+
+    /// Dashboard views that the Top Shelf can show, as (id, title) pairs.
+    var topShelfChoices: [(id: String, title: String)] {
+        dashboards.flatMap { item in
+            item.config.views.filter(DashboardSnapshot.hasGraphs).map {
+                (id: "\(item.id)/\($0.id)", title: "\(item.dashboard.title) – \($0.title)")
+            }
+        }
+    }
+
+    /// Opens a URL from the Top Shelf.
+    func open(_ url: URL) {
+        if url == SharedContainer.dashboardsURL, !dashboards.isEmpty {
+            selectedTab = .dashboards
+        }
     }
 
     // MARK: - Queries

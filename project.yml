@@ -20,12 +20,21 @@ targets:
     sources:
       - App/Sources
       - App/Resources
+      - Shared
     dependencies:
       - package: HomeAssistantKit
+      - target: TopShelf
+    entitlements:
+      path: App/HomeAssistantTV.entitlements
+      properties:
+        com.apple.security.application-groups: [group.uk.co.peterbraden.HomeAssistantTV]
     info:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Home Assistant
+        CFBundleURLTypes:
+          - CFBundleURLName: uk.co.peterbraden.HomeAssistantTV
+            CFBundleURLSchemes: [homeassistanttv]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIRequiredDeviceCapabilities: [arm64]
@@ -45,6 +54,41 @@ targets:
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "3"
         ASSETCATALOG_COMPILER_APPICON_NAME: App Icon & Top Shelf Image
+        CODE_SIGN_STYLE: Automatic
+
+  TopShelf:
+    type: app-extension
+    platform: tvOS
+    sources:
+      - TopShelf
+      - Shared
+    dependencies:
+      - package: HomeAssistantKit
+      - sdk: TVServices.framework
+    entitlements:
+      path: TopShelf/TopShelf.entitlements
+      properties:
+        com.apple.security.application-groups: [group.uk.co.peterbraden.HomeAssistantTV]
+    info:
+      path: TopShelf/Info.plist
+      properties:
+        CFBundleDisplayName: Home Assistant Top Shelf
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.tv-top-shelf
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ContentProvider
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: uk.co.peterbraden.HomeAssistantTV.TopShelf
+        PRODUCT_NAME: TopShelf
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "3"
         CODE_SIGN_STYLE: Automatic
 
   HomeAssistantTVUITests:

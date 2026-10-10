@@ -1,4 +1,5 @@
 import SwiftUI
+import TVServices
 
 @main
 struct HomeAssistantTVApp: App {
@@ -9,10 +10,17 @@ struct HomeAssistantTVApp: App {
         WindowGroup {
             RootView()
                 .environment(store)
+                .onOpenURL { store.open($0) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
+            switch phase {
+            case .active:
                 store.resumeIfNeeded()
+            case .background:
+                // Ask tvOS to redraw the Top Shelf graphs with fresh data.
+                TVTopShelfContentProvider.topShelfContentDidChange()
+            default:
+                break
             }
         }
     }

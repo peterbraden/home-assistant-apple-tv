@@ -111,6 +111,27 @@ final class ScreenshotTourTests: XCTestCase {
         }
     }
 
+    /// Highlights the app on the Home screen so tvOS shows its Top Shelf, then
+    /// screenshots it. Only moves focus; never presses select.
+    func testTopShelf() throws {
+        // Launching and then leaving the app makes it ask tvOS to refresh the Top Shelf;
+        // otherwise tvOS may wait up to 10 minutes after an install.
+        XCUIApplication().launch()
+        sleep(8)
+        let home = XCUIApplication(bundleIdentifier: "com.apple.HeadBoard")
+        home.activate()
+        sleep(3)
+        let remote = XCUIRemote.shared
+        for _ in 0..<10 where !focusedElement(in: home).label.contains("Home Assistant") {
+            remote.press(.right)
+            sleep(1)
+        }
+        try XCTSkipUnless(focusedElement(in: home).label.contains("Home Assistant"),
+                          "Couldn't find the app in the top row")
+        sleep(25)  // The extension fetches data and renders the image.
+        save("top-shelf")
+    }
+
     /// The focused element's label and identifier; empty when nothing has focus.
     private func focusedElement(in app: XCUIApplication) -> (exists: Bool, label: String, identifier: String) {
         let element = app.descendants(matching: .any).matching(NSPredicate(format: "hasFocus == true")).firstMatch

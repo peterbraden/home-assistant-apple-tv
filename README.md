@@ -14,6 +14,7 @@ A native tvOS app (SwiftUI, tvOS 17+) for controlling Home Assistant from the co
   - Climate: target temperature (single or range), HVAC mode, presets, fan mode
   - Media players: artwork, play/pause/skip, volume, mute, power, source
   - Covers/valves, locks, alarm panels (with code entry), vacuums, fans
+- **Top Shelf** – when the app is highlighted in the top row of the Home screen, the background shows live graphs from a dashboard view (chosen in Settings; by default the first view with graphs). Drawn by a Top Shelf extension that shares the sign-in through an App Group.
 - **Cameras** – live HLS stream (needs the `stream` integration), falling back to 1-second snapshots.
 - **Server discovery** via Bonjour, so you rarely need to type the address.
 - Hidden, disabled, config and diagnostic entities are left out.
