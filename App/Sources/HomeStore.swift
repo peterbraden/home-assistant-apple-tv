@@ -8,7 +8,7 @@ import TVServices
 @Observable
 final class HomeStore {
     enum Tab: Hashable {
-        case rooms, dashboards, assist, devices, settings
+        case rooms, dashboards, media, assist, devices, settings
     }
 
     enum ConnectionState: Equatable {
@@ -32,6 +32,11 @@ final class HomeStore {
     var selectedCategory: EntityCategory = .lights
     /// A transient error from a service call, shown as a banner.
     var actionError: String?
+    /// Media playing on the Apple TV itself.
+    let playback = MediaPlayback()
+    /// Folders open in the Media tab.
+    var mediaPath: [MediaLocation] = []
+    private var ranLaunchActions = false
 
     private var socket: HAWebSocketClient?
     /// Assist pipelines on the server and Home Assistant's preferred one.
@@ -64,6 +69,7 @@ final class HomeStore {
         liveTask = nil
         Task { [socket] in await socket?.close() }
         socket = nil
+        playback.stop()
         CredentialStore.delete()
         config = nil
         entities = [:]
@@ -117,6 +123,12 @@ final class HomeStore {
                 self.socket = socket
                 connectionState = .connected
                 retryDelay = 2
+                #if DEBUG
+                if !ranLaunchActions {
+                    ranLaunchActions = true
+                    Task { await runDebugLaunchActions() }
+                }
+                #endif
 
                 if let info = try? await HAClient(config: config).fetchConfig() {
                     locationName = info.name
@@ -226,6 +238,74 @@ final class HomeStore {
             text, conversationId: conversationId, agentId: pipeline?.conversationEngine, language: language)
     }
 
+    // MARK: - Media
+
+    func browseMedia(_ location: MediaLocation) async throws -> HAMediaItem {
+        guard let socket else { throw HAError.disconnected }
+        switch location {
+        case .source(let contentId):
+            return try await socket.browseMediaSource(contentId)
+        case .player(let entityId, let contentId, let contentType):
+            return try await socket.browseMedia(entityId: entityId, contentId: contentId, contentType: contentType)
+        }
+    }
+
+    /// Media players that can be sent something to play.
+    var mediaTargets: [HAEntity] {
+        visibleEntities.filter {
+            $0.domain == "media_player" && !$0.isUnavailable && $0.supports(HAFeature.MediaPlayer.playMedia)
+        }
+    }
+
+    /// Media players with a library of their own to browse.
+    var browsablePlayers: [HAEntity] {
+        mediaTargets.filter { $0.supports(HAFeature.MediaPlayer.browseMedia) }
+    }
+
+    /// Asks a Home Assistant media player to play an item.
+    func play(_ item: HAMediaItem, on player: HAEntity) {
+        call("media_player", "play_media", on: player, data: [
+            "media_content_id": .string(item.contentId),
+            "media_content_type": .string(item.contentType),
+        ])
+    }
+
+    /// Streams a media-source item on the Apple TV itself.
+    func playHere(_ item: HAMediaItem) async {
+        guard let socket, let config else { return }
+        do {
+            let media = try await socket.resolveMedia(item.contentId)
+            guard let url = config.resolve(media.url) else { throw HAError.invalidURL }
+            let kind = media.mimeType.isEmpty ? item.kind : HAMediaKind(mediaClass: item.mediaClass, contentType: media.mimeType)
+            playback.play(url: url, title: item.title, kind: kind)
+            if kind != .image, let thumbnail = item.thumbnail, let client,
+               let artwork = try? await client.data(at: thumbnail) {
+                playback.setArtwork(artwork)
+            }
+        } catch {
+            actionError = "\(item.title): \(error.localizedDescription)"
+        }
+    }
+
+    #if DEBUG
+    /// Lets the simulator open a media folder (`MEDIA_PATH`) or play a media-source ID
+    /// on the Apple TV (`MEDIA_PLAY`, `MEDIA_TITLE`) without pressing select in UI tests.
+    private func runDebugLaunchActions() async {
+        let environment = ProcessInfo.processInfo.environment
+        if let folder = environment["MEDIA_PATH"] {
+            selectedTab = .media
+            mediaPath = folder == "root" ? [] : [.source(folder)]
+        }
+        if let id = environment["MEDIA_PLAY"] {
+            selectedTab = .media
+            await playHere(HAMediaItem([
+                "media_content_id": .string(id), "title": .string(environment["MEDIA_TITLE"] ?? id),
+                "media_class": "music", "can_play": true,
+            ]))
+        }
+    }
+    #endif
+
     func cameraStreamURL(for entityId: String) async throws -> URL {
         guard let socket else { throw HAError.disconnected }
         return try await socket.cameraStreamURL(entityId: entityId)
@@ -306,6 +386,12 @@ final class HomeStore {
     func entity(_ id: String) -> HAEntity? {
         entities[id]
     }
+}
+
+/// A place in a media tree: Home Assistant's media sources, or a player's own library.
+enum MediaLocation: Hashable {
+    case source(String?)
+    case player(entityId: String, contentId: String?, contentType: String?)
 }
 
 struct LoadedDashboard: Identifiable {

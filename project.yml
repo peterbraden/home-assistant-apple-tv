@@ -41,6 +41,8 @@ targets:
         UIUserInterfaceStyle: Automatic
         NSLocalNetworkUsageDescription: Home Assistant connects to your server on the local network.
         NSBonjourServices: [_home-assistant._tcp]
+        # Radio and other audio keep playing while you use other apps.
+        UIBackgroundModes: [audio]
         NSAppTransportSecurity:
           # Home Assistant is commonly served over plain HTTP on the LAN.
           NSAllowsArbitraryLoads: true

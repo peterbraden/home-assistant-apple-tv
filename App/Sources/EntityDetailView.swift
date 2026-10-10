@@ -327,6 +327,7 @@ private struct ClimateControls: View {
 private struct MediaControls: View {
     let entity: HAEntity
     @Environment(HomeStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
 
     private typealias Feature = HAFeature.MediaPlayer
 
@@ -386,6 +387,14 @@ private struct MediaControls: View {
                         Label(muted ? "Unmute" : "Mute", systemImage: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     }
                 }
+            }
+        }
+
+        if entity.supports(Feature.browseMedia) {
+            Button("Browse Library", systemImage: "rectangle.stack") {
+                store.mediaPath = [.player(entityId: entity.entityId, contentId: nil, contentType: nil)]
+                store.selectedTab = .media
+                dismiss()
             }
         }
 

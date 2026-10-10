@@ -21,6 +21,9 @@ struct HomeTabView: View {
                             .tabItem { Label("Dashboards", systemImage: "chart.xyaxis.line") }
                             .tag(HomeStore.Tab.dashboards)
                     }
+                    MediaTab()
+                        .tabItem { Label("Media", systemImage: "play.rectangle.fill") }
+                        .tag(HomeStore.Tab.media)
                     AssistView()
                         .tabItem { Label("Assist", systemImage: "waveform") }
                         .tag(HomeStore.Tab.assist)
@@ -36,6 +39,20 @@ struct HomeTabView: View {
             }
 
             StatusBanner()
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { store.playback.isPlayerPresented },
+            set: { if !$0 { store.playback.playerDismissed() } }
+        )) {
+            PlayerView(playback: store.playback).ignoresSafeArea()
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { store.playback.presentedImage != nil },
+            set: { if !$0 { store.playback.presentedImage = nil } }
+        )) {
+            if let path = store.playback.presentedImage {
+                MediaImageView(path: path).environment(store)
+            }
         }
         .alert("Couldn't complete action", isPresented: Binding(
             get: { store.actionError != nil },

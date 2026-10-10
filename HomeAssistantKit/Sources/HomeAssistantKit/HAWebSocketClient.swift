@@ -208,6 +208,33 @@ public actor HAWebSocketClient {
         return HAConversationResponse(try await send(command: "conversation/process", fields))
     }
 
+    /// Browses media sources (local media, radio, cameras, Jellyfin…). nil is the root.
+    public func browseMediaSource(_ contentId: String?) async throws -> HAMediaItem {
+        var fields: [String: JSONValue] = [:]
+        if let contentId { fields["media_content_id"] = .string(contentId) }
+        return HAMediaItem(try await send(command: "media_source/browse_media", fields))
+    }
+
+    /// Browses what a media player can play. nil ID and type are the player's root.
+    public func browseMedia(
+        entityId: String, contentId: String? = nil, contentType: String? = nil
+    ) async throws -> HAMediaItem {
+        var fields: [String: JSONValue] = ["entity_id": .string(entityId)]
+        if let contentId, let contentType {
+            fields["media_content_id"] = .string(contentId)
+            fields["media_content_type"] = .string(contentType)
+        }
+        return HAMediaItem(try await send(command: "media_player/browse_media", fields))
+    }
+
+    /// Turns a media-source ID into a URL that can be streamed directly.
+    public func resolveMedia(_ contentId: String) async throws -> HAResolvedMedia {
+        guard let media = HAResolvedMedia(try await send(command: "media_source/resolve_media",
+                                                         ["media_content_id": .string(contentId)]))
+        else { throw HAError.invalidResponse }
+        return media
+    }
+
     public func cameraStreamURL(entityId: String) async throws -> URL {
         let result = try await send(command: "camera/stream", ["entity_id": .string(entityId)])
         guard let path = result["url"]?.stringValue, let url = config.resolve(path) else {

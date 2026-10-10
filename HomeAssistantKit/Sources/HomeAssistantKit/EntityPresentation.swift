@@ -275,10 +275,12 @@ public enum HAFeature {
         public static let nextTrack = 32
         public static let turnOn = 128
         public static let turnOff = 256
+        public static let playMedia = 512
         public static let volumeStep = 1024
         public static let selectSource = 2048
         public static let stop = 4096
         public static let play = 16384
+        public static let browseMedia = 131072
     }
 
     public enum Climate {
