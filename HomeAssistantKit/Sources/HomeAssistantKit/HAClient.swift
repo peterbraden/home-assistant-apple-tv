@@ -70,7 +70,10 @@ public struct HAClient: Sendable {
 
     private func makeRequest(_ url: URL) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
-        request.setValue("Bearer \(config.accessToken)", forHTTPHeaderField: "Authorization")
+        // Artwork and entity pictures can live on other sites: never send them the token.
+        if config.isOnServer(url) {
+            request.setValue("Bearer \(config.accessToken)", forHTTPHeaderField: "Authorization")
+        }
         return request
     }
 

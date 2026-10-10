@@ -100,6 +100,19 @@ import Testing
         #expect(config.resolve("/api/camera_proxy/camera.door?token=1")?.absoluteString
             == "https://ha.example.com/api/camera_proxy/camera.door?token=1")
     }
+
+    @Test func onlyTrustsOwnServerWithToken() throws {
+        let config = try HAServerConfig(address: "192.168.88.20:8123", accessToken: "t")
+        #expect(config.isOnServer(config.resolve("/api/media_player_proxy/x")!))
+        #expect(config.isOnServer(URL(string: "HTTP://192.168.88.20:8123/local/a.png")!))
+        #expect(!config.isOnServer(URL(string: "http://192.168.88.20/a.png")!))
+        #expect(!config.isOnServer(URL(string: "https://192.168.88.20:8123/a.png")!))
+        #expect(!config.isOnServer(URL(string: "http://radio.example.com/logo.png")!))
+
+        let secure = try HAServerConfig(address: "https://ha.example.com", accessToken: "t")
+        #expect(secure.isOnServer(URL(string: "https://ha.example.com:443/x")!))
+        #expect(!secure.isOnServer(URL(string: "https://ha.example.com.evil.net/x")!))
+    }
 }
 
 @Suite struct RegistryTests {

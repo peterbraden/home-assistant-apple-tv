@@ -63,6 +63,21 @@ public struct HAServerConfig: Codable, Hashable, Sendable {
         return URL(string: path, relativeTo: baseURL)?.absoluteURL
     }
 
+    /// Whether `url` is on this server, so it may be sent the access token.
+    public func isOnServer(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == baseURL.scheme?.lowercased()
+            && url.host?.lowercased() == baseURL.host?.lowercased()
+            && (url.port ?? defaultPort(url.scheme)) == (baseURL.port ?? defaultPort(baseURL.scheme))
+    }
+
+    private func defaultPort(_ scheme: String?) -> Int? {
+        switch scheme?.lowercased() {
+        case "https": return 443
+        case "http": return 80
+        default: return nil
+        }
+    }
+
     public var webSocketURL: URL {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
         components.scheme = baseURL.scheme == "https" ? "wss" : "ws"
