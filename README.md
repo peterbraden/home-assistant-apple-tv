@@ -55,6 +55,8 @@ TEST_RUNNER_SCREENSHOT_DIR=/tmp/ha-tour \
   -destination 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation)'
 ```
 
+App icon and Top Shelf images are drawn by `scripts/generate-icons.swift`; run `swift scripts/generate-icons.swift` after changing it.
+
 ## Signing in
 
 1. In Home Assistant, open your **Profile → Security → Long-lived access tokens** and create a token.
