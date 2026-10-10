@@ -1,6 +1,9 @@
 import Foundation
 import HomeAssistantKit
+import OSLog
 import Security
+
+private let logger = Logger(subsystem: "HomeAssistantTV", category: "Keychain")
 
 /// Persists the server address and access token in the Keychain.
 enum CredentialStore {
@@ -21,9 +24,13 @@ enum CredentialStore {
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data
-        else { return nil }
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            if status != errSecItemNotFound {
+                logger.error("Loading credentials failed: \(status)")
+            }
+            return nil
+        }
         return try? JSONDecoder().decode(HAServerConfig.self, from: data)
     }
 
@@ -33,7 +40,10 @@ enum CredentialStore {
         var query = baseQuery
         query[kSecValueData as String] = data
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            logger.error("Saving credentials failed: \(status)")
+        }
     }
 
     static func delete() {
