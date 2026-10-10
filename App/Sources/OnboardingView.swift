@@ -20,6 +20,7 @@ struct OnboardingView: View {
                 Text("Control your home from the couch. Connect to your Home Assistant server to get started.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("To create an access token:")
@@ -32,6 +33,7 @@ struct OnboardingView: View {
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 24)
             }
             .frame(maxWidth: 700, alignment: .leading)
