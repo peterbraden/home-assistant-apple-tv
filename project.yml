@@ -44,8 +44,25 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
 
+  HomeAssistantTVUITests:
+    type: bundle.ui-testing
+    platform: tvOS
+    sources:
+      - UITests
+    dependencies:
+      - target: HomeAssistantTV
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: uk.co.peterbraden.HomeAssistantTVUITests
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "3"
+
 schemes:
   HomeAssistantTV:
     build:
       targets:
         HomeAssistantTV: all
+    test:
+      targets:
+        - HomeAssistantTVUITests

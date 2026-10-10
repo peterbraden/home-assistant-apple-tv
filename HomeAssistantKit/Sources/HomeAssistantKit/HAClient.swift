@@ -59,7 +59,7 @@ public struct HAClient: Sendable {
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
-        let url = path.isEmpty ? config.baseURL.appending(path: "api/") : config.apiURL(path)
+        let url = path.isEmpty ? config.apiRootURL : config.apiURL(path)
         let data = try await perform(makeRequest(url))
         do {
             return try JSONDecoder().decode(T.self, from: data)

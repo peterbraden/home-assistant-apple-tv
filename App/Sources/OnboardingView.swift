@@ -111,6 +111,9 @@ struct OnboardingView: View {
         let environment = ProcessInfo.processInfo.environment
         if address.isEmpty, let url = environment["HA_URL"] { address = url }
         if token.isEmpty, let value = environment["HA_TOKEN"] { token = value }
+        if environment["HA_AUTOCONNECT"] == "1", !address.isEmpty, !token.isEmpty {
+            Task { await connect() }
+        }
         #endif
     }
 

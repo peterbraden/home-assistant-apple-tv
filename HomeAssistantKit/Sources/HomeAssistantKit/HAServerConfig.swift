@@ -44,6 +44,13 @@ public struct HAServerConfig: Codable, Hashable, Sendable {
         return components.url
     }
 
+    /// `/api/`, the endpoint that reports whether the API is running.
+    public var apiRootURL: URL {
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+        components.path = "/api/"
+        return components.url!
+    }
+
     public func apiURL(_ path: String) -> URL {
         baseURL.appending(path: "api").appending(path: path)
     }

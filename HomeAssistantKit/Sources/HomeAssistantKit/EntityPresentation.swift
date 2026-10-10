@@ -5,7 +5,6 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
     case lights
     case climate
     case media
-    case cameras
     case security
     case scenes
     case sensors
@@ -17,7 +16,6 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
         case .lights: return "Lights"
         case .climate: return "Climate"
         case .media: return "Media"
-        case .cameras: return "Cameras"
         case .security: return "Security"
         case .scenes: return "Scenes"
         case .sensors: return "Sensors"
@@ -29,8 +27,7 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
         case .lights: return "lightbulb.fill"
         case .climate: return "thermometer.medium"
         case .media: return "play.tv.fill"
-        case .cameras: return "video.fill"
-        case .security: return "lock.fill"
+        case .security: return "lock.shield.fill"
         case .scenes: return "sparkles"
         case .sensors: return "gauge.with.dots.needle.33percent"
         }
@@ -44,9 +41,7 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
             return .climate
         case "media_player", "remote":
             return .media
-        case "camera":
-            return .cameras
-        case "lock", "alarm_control_panel", "cover", "valve":
+        case "lock", "alarm_control_panel", "cover", "valve", "camera":
             return .security
         case "scene", "script", "button", "input_button":
             return .scenes
@@ -160,7 +155,10 @@ extension HAEntity {
             }
         case "remote": return "appletvremote.gen4.fill"
         case "camera": return "video.fill"
-        case "lock": return state == "locked" ? "lock.fill" : "lock.open.fill"
+        case "lock":
+            // Never show an open padlock for a lock whose state isn't known.
+            if isUnavailable { return "lock.slash" }
+            return state == "locked" ? "lock.fill" : "lock.open.fill"
         case "alarm_control_panel": return state == "disarmed" ? "shield" : "shield.lefthalf.filled"
         case "cover":
             switch deviceClass {

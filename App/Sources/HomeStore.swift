@@ -156,6 +156,18 @@ final class HomeStore {
         return EntityCategory.allCases.filter(present.contains)
     }
 
+    /// Categories to show as tabs. tvOS shows at most 7 tabs and silently drops
+    /// the rest, so Rooms, the categories and Settings must fit within that.
+    var tabCategories: [EntityCategory] {
+        var categories = availableCategories
+        let limit = 7 - 1 - (rooms.isEmpty ? 0 : 1)
+        if categories.count > limit, !rooms.isEmpty {
+            // Scenes also appear in their rooms, so they're the first to go.
+            categories.removeAll { $0 == .scenes }
+        }
+        return Array(categories.prefix(limit))
+    }
+
     func entities(in category: EntityCategory) -> [HAEntity] {
         visibleEntities.filter { $0.category == category }
     }

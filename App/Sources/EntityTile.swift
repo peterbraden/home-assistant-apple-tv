@@ -14,7 +14,7 @@ struct EntityTile: View {
             if entity.domain == "camera" {
                 CameraTileContent(entity: entity)
             } else {
-                StandardTileContent(entity: entity)
+                StandardTileContent(entity: entity, name: store.registry.name(for: entity))
             }
         }
         .buttonStyle(.card)
@@ -43,26 +43,34 @@ struct EntityTile: View {
 
 private struct StandardTileContent: View {
     let entity: HAEntity
+    let name: HAEntityName
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             Image(systemName: entity.symbolName)
-                .font(.system(size: 50, weight: .medium))
+                .font(.system(size: 44, weight: .medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(entity.tint)
-                .frame(height: 60)
+                .frame(height: 50)
             Spacer(minLength: 0)
-            Text(entity.friendlyName)
+            if let device = name.device {
+                Text(device)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .foregroundStyle(.secondary)
+            }
+            Text(name.name)
                 .font(.headline)
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.primary)
             Text(entity.displayState)
                 .font(.callout)
                 .lineLimit(1)
                 .foregroundStyle(.secondary)
         }
-        .padding(28)
-        .frame(width: 340, height: 220, alignment: .leading)
+        .padding(24)
+        .frame(width: 340, height: 260, alignment: .leading)
         .background(entity.isActive ? entity.tint.opacity(0.18) : .clear)
         .opacity(entity.isUnavailable ? 0.5 : 1)
     }
@@ -73,22 +81,36 @@ private struct CameraTileContent: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            AuthorizedImage(
-                path: entity.entityPicture ?? "/api/camera_proxy/\(entity.entityId)",
-                contentMode: .fill,
-                refreshInterval: .seconds(10)
-            )
-            .frame(width: 340, height: 220)
-            .clipped()
+            if entity.isUnavailable {
+                Color.black.opacity(0.3)
+                Image(systemName: "video.slash.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                AuthorizedImage(
+                    path: entity.entityPicture ?? "/api/camera_proxy/\(entity.entityId)",
+                    contentMode: .fill,
+                    refreshInterval: .seconds(10)
+                )
+                .frame(width: 340, height: 260)
+                .clipped()
+            }
 
             LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom)
 
-            Label(entity.friendlyName, systemImage: "video.fill")
-                .font(.headline)
-                .foregroundStyle(.white)
-                .padding(20)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entity.friendlyName)
+                    .font(.headline)
+                    .lineLimit(1)
+                if entity.isUnavailable {
+                    Text(entity.displayState).font(.callout).opacity(0.7)
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(24)
         }
-        .frame(width: 340, height: 220)
+        .frame(width: 340, height: 260)
     }
 }
 

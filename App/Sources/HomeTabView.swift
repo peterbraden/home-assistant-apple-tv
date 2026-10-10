@@ -14,7 +14,7 @@ struct HomeTabView: View {
                         SectionedGridView(sections: store.rooms)
                             .tabItem { Label("Rooms", systemImage: "house.fill") }
                     }
-                    ForEach(store.availableCategories) { category in
+                    ForEach(store.tabCategories) { category in
                         SectionedGridView(sections: store.sections(for: store.entities(in: category)))
                             .tabItem { Label(category.title, systemImage: category.symbol) }
                     }

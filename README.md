@@ -58,6 +58,8 @@ SIMCTL_CHILD_HA_URL=http://homeassistant.local:8123 SIMCTL_CHILD_HA_TOKEN="$(pbp
   xcrun simctl launch booted uk.co.peterbraden.HomeAssistantTV
 ```
 
+Add `SIMCTL_CHILD_HA_AUTOCONNECT=1` to sign in straight away instead of choosing Connect.
+
 Grouping by room reads the area, device and entity registries, which needs an **admin** user. With a non-admin token the app still works, but without the Rooms tab.
 
 ## Notes
