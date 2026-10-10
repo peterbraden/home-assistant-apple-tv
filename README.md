@@ -51,6 +51,13 @@ swift test --package-path HomeAssistantKit
 2. On the Apple TV, pick your server from the discovered list (or type its address, e.g. `homeassistant.local:8123`).
 3. Select the token field. Your iPhone will show a keyboard notification, so you can paste the token there instead of typing it with the remote.
 
+In the simulator, debug builds can skip typing: copy the token on your Mac, then launch with
+
+```sh
+SIMCTL_CHILD_HA_URL=http://homeassistant.local:8123 SIMCTL_CHILD_HA_TOKEN="$(pbpaste)" \
+  xcrun simctl launch booted uk.co.peterbraden.HomeAssistantTV
+```
+
 Grouping by room reads the area, device and entity registries, which needs an **admin** user. With a non-admin token the app still works, but without the Rooms tab.
 
 ## Notes

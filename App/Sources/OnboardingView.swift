@@ -96,8 +96,22 @@ struct OnboardingView: View {
             .frame(maxWidth: 800)
         }
         .padding(80)
-        .onAppear { discovery.start() }
+        .onAppear {
+            discovery.start()
+            prefillFromEnvironment()
+        }
         .onDisappear { discovery.stop() }
+    }
+
+    /// Debug builds read `HA_URL` and `HA_TOKEN` from the launch environment, so the
+    /// simulator can be signed in without typing. Pass them to `simctl launch` as
+    /// `SIMCTL_CHILD_HA_URL` / `SIMCTL_CHILD_HA_TOKEN`.
+    private func prefillFromEnvironment() {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if address.isEmpty, let url = environment["HA_URL"] { address = url }
+        if token.isEmpty, let value = environment["HA_TOKEN"] { token = value }
+        #endif
     }
 
     private func connect() async {
