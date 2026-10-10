@@ -15,6 +15,8 @@ A native tvOS app (SwiftUI, tvOS 17+) for controlling Home Assistant from the co
   - Media players: artwork, play/pause/skip, volume, mute, power, source
   - Covers/valves, locks, alarm panels (with code entry), vacuums, fans
 - **Top Shelf** – when the app is highlighted in the top row of the Home screen, the background shows live graphs from a dashboard view (chosen in Settings; by default the first view with graphs). Drawn by a Top Shelf extension that shares the sign-in through an App Group.
+- **Assist** – search devices, or send the same words to Home Assistant Assist (hold the Siri Remote mic to dictate). Text only goes to Assist when you press "Ask Assist", so searching for a device never operates it. The agent defaults to the preferred pipeline and can be changed in Settings.
+- **Keep dashboards on screen** – optional setting that holds off the screen saver while a dashboard is showing.
 - **Cameras** – live HLS stream (needs the `stream` integration), falling back to 1-second snapshots.
 - **Server discovery** via Bonjour, so you rarely need to type the address.
 - Hidden, disabled, config and diagnostic entities are left out.

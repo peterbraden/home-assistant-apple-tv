@@ -5,6 +5,8 @@ import TVServices
 struct SettingsView: View {
     @Environment(HomeStore.self) private var store
     @State private var topShelfView = SharedContainer.topShelfView ?? ""
+    @AppStorage("keepDashboardsAwake") private var keepDashboardsAwake = false
+    @AppStorage("assistPipeline") private var assistPipeline = ""
 
     var body: some View {
         Form {
@@ -16,6 +18,27 @@ struct SettingsView: View {
                 }
                 LabeledContent("Status", value: statusText)
                 LabeledContent("Entities", value: "\(store.entities.count)")
+            }
+
+            if store.assistPipelines.count > 1 {
+                Section {
+                    Picker("Assist", selection: $assistPipeline) {
+                        Text("Preferred (\(store.preferredAssistPipeline?.name ?? "default"))").tag("")
+                        ForEach(store.assistPipelines, id: \.id) { pipeline in
+                            Text(pipeline.name).tag(pipeline.id)
+                        }
+                    }
+                } footer: {
+                    Text("The voice assistant that answers in the Assist tab.")
+                }
+            }
+
+            if !store.dashboards.isEmpty {
+                Section {
+                    Toggle("Keep Dashboards on Screen", isOn: $keepDashboardsAwake)
+                } footer: {
+                    Text("Stops the screen saver starting while a dashboard is showing.")
+                }
             }
 
             if !store.topShelfChoices.isEmpty {

@@ -8,7 +8,7 @@ import TVServices
 @Observable
 final class HomeStore {
     enum Tab: Hashable {
-        case rooms, dashboards, settings
+        case rooms, dashboards, assist, settings
         case category(EntityCategory)
     }
 
@@ -33,6 +33,9 @@ final class HomeStore {
     var actionError: String?
 
     private var socket: HAWebSocketClient?
+    /// Assist pipelines on the server and Home Assistant's preferred one.
+    private(set) var assistPipelines: [HAAssistPipeline] = []
+    private(set) var preferredAssistPipeline: HAAssistPipeline?
     private var liveTask: Task<Void, Never>?
 
     var client: HAClient? { config.map { HAClient(config: $0) } }
@@ -65,6 +68,8 @@ final class HomeStore {
         entities = [:]
         registry = .empty
         dashboards = []
+        assistPipelines = []
+        preferredAssistPipeline = nil
         connectionState = .signedOut
         TVTopShelfContentProvider.topShelfContentDidChange()
     }
@@ -96,11 +101,14 @@ final class HomeStore {
                 // Registries are optional: they need an admin user.
                 let registry = (try? await socket.fetchRegistry()) ?? .empty
                 let dashboards = await loadDashboards(from: socket)
+                let pipelines = try? await socket.fetchPipelines()
 
                 guard !Task.isCancelled else { await socket.close(); return }
                 self.entities = Dictionary(states.map { ($0.entityId, $0) }, uniquingKeysWith: { _, new in new })
                 self.registry = registry
                 self.dashboards = dashboards
+                self.assistPipelines = pipelines?.pipelines ?? []
+                self.preferredAssistPipeline = pipelines?.preferred
                 if selectedTab == .rooms, rooms.isEmpty {
                     // Non-admin users have no Rooms tab.
                     selectedTab = dashboards.isEmpty ? (tabCategories.first.map(Tab.category) ?? .settings) : .dashboards
@@ -199,6 +207,24 @@ final class HomeStore {
         return try await socket.fetchStatistic(id: id, period: period, types: types)
     }
 
+    // MARK: - Assist
+
+    /// The pipeline chosen in Settings, or Home Assistant's preferred one.
+    var assistPipeline: HAAssistPipeline? {
+        let chosen = UserDefaults.standard.string(forKey: "assistPipeline")
+        return assistPipelines.first { $0.id == chosen } ?? preferredAssistPipeline
+    }
+
+    /// Sends a sentence to Assist using the agent and language of the chosen pipeline.
+    func ask(_ text: String, conversationId: String?) async throws -> HAConversationResponse {
+        guard let socket else { throw HAError.disconnected }
+        let pipeline = assistPipeline
+        // "*" means the agent accepts any language; let Home Assistant use its default.
+        let language = pipeline?.language == "*" ? nil : pipeline?.language
+        return try await socket.processConversation(
+            text, conversationId: conversationId, agentId: pipeline?.conversationEngine, language: language)
+    }
+
     func cameraStreamURL(for entityId: String) async throws -> URL {
         guard let socket else { throw HAError.disconnected }
         return try await socket.cameraStreamURL(entityId: entityId)
@@ -235,11 +261,30 @@ final class HomeStore {
         return EntityCategory.allCases.filter(present.contains)
     }
 
-    /// Categories to show as tabs. tvOS shows at most 7 tabs and silently drops
-    /// the rest, so Rooms, Dashboards, the categories and Settings must fit within that.
+    /// Visible entities whose name, ID or area matches `query`, best matches first.
+    func search(_ query: String) -> [HAEntity] {
+        guard !query.isEmpty else { return [] }
+        let matches = visibleEntities.filter { entity in
+            entity.friendlyName.localizedCaseInsensitiveContains(query)
+                || entity.entityId.localizedCaseInsensitiveContains(query)
+                || registry.areaName(for: entity.entityId)?.localizedCaseInsensitiveContains(query) == true
+        }
+        // Names that start with the query first, controllable entities before sensors.
+        let ranked = matches.enumerated().sorted { a, b in
+            func rank(_ entity: HAEntity) -> Int {
+                (entity.friendlyName.lowercased().hasPrefix(query.lowercased()) ? 0 : 2)
+                    + (entity.isControllable ? 0 : 1)
+            }
+            return (rank(a.element), a.offset) < (rank(b.element), b.offset)
+        }
+        return ranked.prefix(40).map(\.element)
+    }
+
+    /// Categories to show as tabs. tvOS shows at most 7 tabs and silently drops the
+    /// rest, so Rooms, Dashboards, Assist, the categories and Settings must fit within that.
     var tabCategories: [EntityCategory] {
         var categories = availableCategories
-        let limit = 7 - 1 - (rooms.isEmpty ? 0 : 1) - (dashboards.isEmpty ? 0 : 1)
+        let limit = 7 - 2 - (rooms.isEmpty ? 0 : 1) - (dashboards.isEmpty ? 0 : 1)
         if categories.count > limit, !rooms.isEmpty {
             // Scenes also appear in their rooms, so they're the first to go.
             categories.removeAll { $0 == .scenes }

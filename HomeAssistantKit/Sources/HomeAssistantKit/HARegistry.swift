@@ -134,6 +134,10 @@ public struct HARegistry: Sendable {
         areaByEntity[entityId]
     }
 
+    public func areaName(for entityId: String) -> String? {
+        areaId(for: entityId).flatMap { id in areas.first { $0.areaId == id }?.name }
+    }
+
     /// Splits off the device name when the entity's name starts with it.
     public func name(for entity: HAEntity) -> HAEntityName {
         let full = entity.friendlyName

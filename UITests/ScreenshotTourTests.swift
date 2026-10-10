@@ -111,6 +111,35 @@ final class ScreenshotTourTests: XCTestCase {
         }
     }
 
+    /// Opens the Assist tab and types a search. Only moves focus and types:
+    /// never presses select, so nothing is sent to Assist and no device is operated.
+    func testAssistSearch() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let url = environment["HA_URL"], let token = environment["HA_TOKEN"] else {
+            throw XCTSkip("Set TEST_RUNNER_HA_URL and TEST_RUNNER_HA_TOKEN to run against a server.")
+        }
+
+        let app = XCUIApplication()
+        app.launchEnvironment = ["HA_URL": url, "HA_TOKEN": token, "HA_AUTOCONNECT": "1"]
+        app.launch()
+
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 30), "Never reached the main screen")
+        sleep(2)
+        for _ in 0..<6 where focusedTabName(in: tabBar) != "Assist" {
+            XCUIRemote.shared.press(.right)
+            sleep(2)
+        }
+        XCTAssertEqual(focusedTabName(in: tabBar), "Assist")
+        save("assist-empty")
+
+        XCUIRemote.shared.press(.down)
+        sleep(2)
+        app.typeText(environment["SEARCH_TEXT"] ?? "light")
+        sleep(3)
+        save("assist-search")
+    }
+
     /// Highlights the app on the Home screen so tvOS shows its Top Shelf, then
     /// screenshots it. Only moves focus; never presses select.
     func testTopShelf() throws {

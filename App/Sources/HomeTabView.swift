@@ -21,6 +21,9 @@ struct HomeTabView: View {
                             .tabItem { Label("Dashboards", systemImage: "chart.xyaxis.line") }
                             .tag(HomeStore.Tab.dashboards)
                     }
+                    AssistView()
+                        .tabItem { Label("Assist", systemImage: "waveform") }
+                        .tag(HomeStore.Tab.assist)
                     ForEach(store.tabCategories) { category in
                         SectionedGridView(sections: store.sections(for: store.entities(in: category)))
                             .tabItem { Label(category.title, systemImage: category.symbol) }
@@ -92,8 +95,10 @@ private struct StatusBanner: View {
     }
 }
 
-struct SectionedGridView: View {
+struct SectionedGridView<Header: View>: View {
     let sections: [EntitySection]
+    /// Content shown above the sections, scrolling with them.
+    @ViewBuilder let header: Header
 
     @Environment(HomeStore.self) private var store
     @State private var selection: EntitySelection?
@@ -104,6 +109,7 @@ struct SectionedGridView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 50) {
+                header
                 ForEach(sections) { section in
                     VStack(alignment: .leading, spacing: 24) {
                         if !section.title.isEmpty {
@@ -136,6 +142,12 @@ struct SectionedGridView: View {
             CameraView(entityId: selection.id)
                 .environment(store)
         }
+    }
+}
+
+extension SectionedGridView where Header == EmptyView {
+    init(sections: [EntitySection]) {
+        self.init(sections: sections) { EmptyView() }
     }
 }
 

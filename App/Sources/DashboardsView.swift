@@ -6,6 +6,7 @@ struct DashboardsView: View {
     @Environment(HomeStore.self) private var store
     @State private var dashboardID: String?
     @State private var viewID: String?
+    @AppStorage("keepDashboardsAwake") private var keepAwake = false
 
     var body: some View {
         let dashboards = store.dashboards
@@ -45,6 +46,10 @@ struct DashboardsView: View {
             .padding(.horizontal, 60)
             .padding(.vertical, 40)
         }
+        // Optionally hold off the screen saver, so a dashboard can stay up as a wall display.
+        .onAppear { UIApplication.shared.isIdleTimerDisabled = keepAwake }
+        .onChange(of: keepAwake) { _, newValue in UIApplication.shared.isIdleTimerDisabled = newValue }
+        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
     }
 }
 

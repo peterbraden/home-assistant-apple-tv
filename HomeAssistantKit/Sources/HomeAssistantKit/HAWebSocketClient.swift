@@ -191,6 +191,23 @@ public actor HAWebSocketClient {
     }
 
     /// Requests an HLS stream for a camera. Requires the `stream` integration.
+    /// All Assist pipelines, and the one chosen as preferred in Home Assistant's voice settings.
+    public func fetchPipelines() async throws -> (pipelines: [HAAssistPipeline], preferred: HAAssistPipeline?) {
+        let result = try await send(command: "assist_pipeline/pipeline/list")
+        return (HAAssistPipeline.all(from: result), HAAssistPipeline.preferred(from: result))
+    }
+
+    /// Sends a sentence to Assist, which may run actions or answer a question.
+    public func processConversation(
+        _ text: String, conversationId: String? = nil, agentId: String? = nil, language: String? = nil
+    ) async throws -> HAConversationResponse {
+        var fields: [String: JSONValue] = ["text": .string(text)]
+        if let conversationId { fields["conversation_id"] = .string(conversationId) }
+        if let agentId { fields["agent_id"] = .string(agentId) }
+        if let language { fields["language"] = .string(language) }
+        return HAConversationResponse(try await send(command: "conversation/process", fields))
+    }
+
     public func cameraStreamURL(entityId: String) async throws -> URL {
         let result = try await send(command: "camera/stream", ["entity_id": .string(entityId)])
         guard let path = result["url"]?.stringValue, let url = config.resolve(path) else {
