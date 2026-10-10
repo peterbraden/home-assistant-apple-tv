@@ -1,0 +1,205 @@
+import Foundation
+
+/// A `state_changed` event. `newState` is nil when the entity was removed.
+public struct HAStateChange: Sendable, Hashable {
+    public let entityId: String
+    public let newState: HAEntity?
+
+    public init(entityId: String, newState: HAEntity?) {
+        self.entityId = entityId
+        self.newState = newState
+    }
+
+    /// Parses the `event.data` payload of a `state_changed` event.
+    public init?(eventData: JSONValue) {
+        guard let entityId = eventData["entity_id"]?.stringValue else { return nil }
+        self.entityId = entityId
+        if let newState = eventData["new_state"], newState != .null {
+            self.newState = try? newState.decode(as: HAEntity.self)
+        } else {
+            self.newState = nil
+        }
+    }
+}
+
+/// A single connection to the Home Assistant WebSocket API.
+///
+/// Instances are one-shot: once the socket drops, `stateChanges` finishes and
+/// a new client should be created to reconnect.
+public actor HAWebSocketClient {
+    public nonisolated let config: HAServerConfig
+    public nonisolated let stateChanges: AsyncStream<HAStateChange>
+
+    private let session: URLSession
+    private let stateContinuation: AsyncStream<HAStateChange>.Continuation
+    private var task: URLSessionWebSocketTask?
+    private var receiveTask: Task<Void, Never>?
+    private var nextID = 1
+    private var pending: [Int: CheckedContinuation<JSONValue, Error>] = [:]
+    private var stateSubscriptionID: Int?
+    private var isClosed = false
+
+    public init(config: HAServerConfig, session: URLSession = .shared) {
+        self.config = config
+        self.session = session
+        (stateChanges, stateContinuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
+    }
+
+    /// Opens the socket and performs the authentication handshake.
+    public func connect() async throws {
+        let task = session.webSocketTask(with: config.webSocketURL)
+        self.task = task
+        task.resume()
+
+        do {
+            let hello = try await receiveMessage(on: task)
+            guard hello["type"]?.stringValue == "auth_required" else { throw HAError.invalidResponse }
+
+            try await send(["type": "auth", "access_token": .string(config.accessToken)], on: task)
+
+            let auth = try await receiveMessage(on: task)
+            switch auth["type"]?.stringValue {
+            case "auth_ok": break
+            case "auth_invalid": throw HAError.unauthorized
+            default: throw HAError.invalidResponse
+            }
+        } catch {
+            close()
+            throw error
+        }
+
+        receiveTask = Task { [weak self] in
+            await self?.receiveLoop(on: task)
+        }
+    }
+
+    public func close() {
+        guard !isClosed else { return }
+        isClosed = true
+        receiveTask?.cancel()
+        task?.cancel(with: .normalClosure, reason: nil)
+        task = nil
+        for continuation in pending.values {
+            continuation.resume(throwing: HAError.disconnected)
+        }
+        pending.removeAll()
+        stateContinuation.finish()
+    }
+
+    /// Sends a command and returns its `result` payload.
+    @discardableResult
+    public func send(command type: String, _ fields: [String: JSONValue] = [:]) async throws -> JSONValue {
+        guard let task, !isClosed else { throw HAError.disconnected }
+        let id = nextID
+        nextID += 1
+
+        var message = fields
+        message["id"] = .number(Double(id))
+        message["type"] = .string(type)
+        let payload = JSONValue.object(message)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            pending[id] = continuation
+            Task {
+                do {
+                    try await self.send(payload, on: task)
+                } catch {
+                    self.fail(id: id, error: error)
+                }
+            }
+        }
+    }
+
+    public func subscribeToStateChanges() async throws {
+        guard stateSubscriptionID == nil else { return }
+        stateSubscriptionID = nextID
+        do {
+            try await send(command: "subscribe_events", ["event_type": "state_changed"])
+        } catch {
+            stateSubscriptionID = nil
+            throw error
+        }
+    }
+
+    public func fetchStates() async throws -> [HAEntity] {
+        try await send(command: "get_states").decode(as: [HAEntity].self)
+    }
+
+    public func fetchRegistry() async throws -> HARegistry {
+        async let areas = send(command: "config/area_registry/list")
+        async let devices = send(command: "config/device_registry/list")
+        async let entities = send(command: "config/entity_registry/list")
+        return HARegistry(
+            areas: try await areas.decode(),
+            devices: try await devices.decode(),
+            entities: try await entities.decode()
+        )
+    }
+
+    /// Requests an HLS stream for a camera. Requires the `stream` integration.
+    public func cameraStreamURL(entityId: String) async throws -> URL {
+        let result = try await send(command: "camera/stream", ["entity_id": .string(entityId)])
+        guard let path = result["url"]?.stringValue, let url = config.resolve(path) else {
+            throw HAError.invalidResponse
+        }
+        return url
+    }
+
+    // MARK: - Private
+
+    private func fail(id: Int, error: Error) {
+        pending.removeValue(forKey: id)?.resume(throwing: error)
+    }
+
+    private func receiveLoop(on task: URLSessionWebSocketTask) async {
+        while !Task.isCancelled {
+            do {
+                let message = try await receiveMessage(on: task)
+                handle(message)
+            } catch {
+                break
+            }
+        }
+        close()
+    }
+
+    private func handle(_ message: JSONValue) {
+        let id = message["id"]?.intValue
+        switch message["type"]?.stringValue {
+        case "result":
+            guard let id, let continuation = pending.removeValue(forKey: id) else { return }
+            if message["success"]?.boolValue == true {
+                continuation.resume(returning: message["result"] ?? .null)
+            } else {
+                let error = message["error"]
+                continuation.resume(throwing: HAError.commandFailed(
+                    code: error?["code"]?.stringValue ?? "unknown",
+                    message: error?["message"]?.stringValue ?? "Command failed"
+                ))
+            }
+        case "event":
+            guard id == stateSubscriptionID,
+                  let data = message["event"]?["data"],
+                  let change = HAStateChange(eventData: data)
+            else { return }
+            stateContinuation.yield(change)
+        default:
+            break
+        }
+    }
+
+    private func send(_ value: JSONValue, on task: URLSessionWebSocketTask) async throws {
+        let data = try JSONEncoder().encode(value)
+        try await task.send(.string(String(decoding: data, as: UTF8.self)))
+    }
+
+    private func receiveMessage(on task: URLSessionWebSocketTask) async throws -> JSONValue {
+        let data: Data
+        switch try await task.receive() {
+        case .string(let text): data = Data(text.utf8)
+        case .data(let bytes): data = bytes
+        @unknown default: throw HAError.invalidResponse
+        }
+        return try JSONDecoder().decode(JSONValue.self, from: data)
+    }
+}

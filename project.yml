@@ -1,0 +1,51 @@
+name: HomeAssistantTV
+options:
+  bundleIdPrefix: uk.co.peterbraden
+  deploymentTarget:
+    tvOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  HomeAssistantKit:
+    path: HomeAssistantKit
+
+targets:
+  HomeAssistantTV:
+    type: application
+    platform: tvOS
+    sources:
+      - App/Sources
+      - App/Resources
+    dependencies:
+      - package: HomeAssistantKit
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Home Assistant
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIRequiredDeviceCapabilities: [arm64]
+        UIUserInterfaceStyle: Automatic
+        NSLocalNetworkUsageDescription: Home Assistant connects to your server on the local network.
+        NSBonjourServices: [_home-assistant._tcp]
+        NSAppTransportSecurity:
+          # Home Assistant is commonly served over plain HTTP on the LAN.
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: uk.co.peterbraden.HomeAssistantTV
+        PRODUCT_NAME: HomeAssistantTV
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "3"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+
+schemes:
+  HomeAssistantTV:
+    build:
+      targets:
+        HomeAssistantTV: all
