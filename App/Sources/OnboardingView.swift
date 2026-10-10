@@ -70,7 +70,8 @@ struct OnboardingView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
-                SecureField("Long-lived access token", text: $token)
+                // Plain text field so the long token can be checked while it's typed or pasted.
+                TextField("Long-lived access token", text: $token)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
