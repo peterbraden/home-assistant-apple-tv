@@ -16,7 +16,7 @@ struct HomeTabView: View {
                             .tabItem { Label("Rooms", systemImage: "house.fill") }
                             .tag(HomeStore.Tab.rooms)
                     }
-                    if !store.dashboards.isEmpty {
+                    if store.hasDashboards {
                         DashboardsView()
                             .tabItem { Label("Dashboards", systemImage: "chart.xyaxis.line") }
                             .tag(HomeStore.Tab.dashboards)

@@ -8,15 +8,19 @@ struct DashboardsView: View {
     @State private var viewID: String?
     @AppStorage("keepDashboardsAwake") private var keepAwake = false
 
+    /// The pseudo-dashboard ID for the Energy view.
+    private static let energyID = "_energy"
+
     var body: some View {
         let dashboards = store.dashboards
-        let dashboard = dashboards.first { $0.id == dashboardID } ?? dashboards.first
+        let showsEnergy = dashboardID == Self.energyID || (dashboards.isEmpty && store.energyPrefs != nil)
+        let dashboard = showsEnergy ? nil : dashboards.first { $0.id == dashboardID } ?? dashboards.first
         let views = dashboard?.config.views ?? []
         let view = views.first { $0.id == viewID } ?? views.first
 
         ScrollView {
             VStack(alignment: .leading, spacing: 40) {
-                if dashboards.count > 1 {
+                if dashboards.count + (store.energyPrefs == nil ? 0 : 1) > 1 {
                     ControlRow(title: "Dashboard") {
                         ForEach(dashboards) { item in
                             OptionButton(title: item.dashboard.title, isSelected: item.id == dashboard?.id) {
@@ -24,23 +28,33 @@ struct DashboardsView: View {
                                 viewID = nil
                             }
                         }
-                    }
-                }
-                if views.count > 1 {
-                    ControlRow(title: "View") {
-                        ForEach(views) { item in
-                            OptionButton(title: item.title, isSelected: item.id == view?.id) {
-                                viewID = item.id
+                        if store.energyPrefs != nil {
+                            OptionButton(title: "Energy", systemImage: "bolt.fill", isSelected: showsEnergy) {
+                                dashboardID = Self.energyID
+                                viewID = nil
                             }
-                            // Lets UI tests confirm focus is on a view button before pressing select.
-                            .accessibilityIdentifier("dashboard-view-button")
                         }
                     }
                 }
-                if let view {
-                    LovelaceViewContent(view: view)
-                        // Recreate cards when switching views so their data reloads.
-                        .id("\(dashboard?.id ?? "")/\(view.id)")
+                if showsEnergy, let prefs = store.energyPrefs {
+                    EnergyView(prefs: prefs)
+                } else {
+                    if views.count > 1 {
+                        ControlRow(title: "View") {
+                            ForEach(views) { item in
+                                OptionButton(title: item.title, isSelected: item.id == view?.id) {
+                                    viewID = item.id
+                                }
+                                // Lets UI tests confirm focus is on a view button before pressing select.
+                                .accessibilityIdentifier("dashboard-view-button")
+                            }
+                        }
+                    }
+                    if let view {
+                        LovelaceViewContent(view: view)
+                            // Recreate cards when switching views so their data reloads.
+                            .id("\(dashboard?.id ?? "")/\(view.id)")
+                    }
                 }
             }
             .padding(.horizontal, 60)
@@ -50,6 +64,11 @@ struct DashboardsView: View {
         .onAppear { UIApplication.shared.isIdleTimerDisabled = keepAwake }
         .onChange(of: keepAwake) { _, newValue in UIApplication.shared.isIdleTimerDisabled = newValue }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        #if DEBUG
+        .onAppear {
+            if ProcessInfo.processInfo.environment["SHOW_ENERGY"] == "1" { dashboardID = Self.energyID }
+        }
+        #endif
     }
 }
 

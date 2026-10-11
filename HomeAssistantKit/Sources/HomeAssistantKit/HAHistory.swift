@@ -159,3 +159,47 @@ public enum HADownsampler {
         }
     }
 }
+
+/// What the Energy dashboard tracks (`energy/get_prefs`).
+public struct HAEnergyPrefs: Sendable, Hashable {
+    public struct Device: Sendable, Hashable, Identifiable {
+        public let statistic: String
+        public let name: String?
+        public var id: String { statistic }
+    }
+
+    /// Energy drawn from the grid.
+    public let gridImports: [String]
+    /// Energy returned to the grid.
+    public let gridExports: [String]
+    public let solar: [String]
+    /// Individual devices' consumption.
+    public let devices: [Device]
+
+    public init(_ json: JSONValue) {
+        let sources = json["energy_sources"]?.arrayValue ?? []
+        var imports: [String] = [], exports: [String] = [], solar: [String] = []
+        for source in sources {
+            switch source["type"]?.stringValue {
+            case "grid":
+                imports += (source["flow_from"]?.arrayValue ?? []).compactMap { $0["stat_energy_from"]?.stringValue }
+                exports += (source["flow_to"]?.arrayValue ?? []).compactMap { $0["stat_energy_to"]?.stringValue }
+                // Newer releases list one grid source per meter.
+                if let from = source["stat_energy_from"]?.stringValue { imports.append(from) }
+                if let to = source["stat_energy_to"]?.stringValue { exports.append(to) }
+            case "solar":
+                if let from = source["stat_energy_from"]?.stringValue { solar.append(from) }
+            default:
+                break
+            }
+        }
+        gridImports = imports
+        gridExports = exports
+        self.solar = solar
+        devices = (json["device_consumption"]?.arrayValue ?? []).compactMap { item in
+            item["stat_consumption"]?.stringValue.map { Device(statistic: $0, name: item["name"]?.stringValue) }
+        }
+    }
+
+    public var isEmpty: Bool { gridImports.isEmpty && solar.isEmpty && devices.isEmpty }
+}

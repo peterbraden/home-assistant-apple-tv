@@ -228,6 +228,10 @@ public actor HAWebSocketClient {
         return HAConversationResponse(try await send(command: "conversation/process", fields))
     }
 
+    public func fetchEnergyPrefs() async throws -> HAEnergyPrefs {
+        HAEnergyPrefs(try await send(command: "energy/get_prefs"))
+    }
+
     /// Logbook entries for the given entities, oldest first.
     public func fetchLogbook(entityIds: [String], start: Date) async throws -> [HALogbookEntry] {
         HALogbookEntry.list(from: try await send(command: "logbook/get_events", [

@@ -43,4 +43,23 @@ private func json(_ text: String) throws -> JSONValue {
         #expect(forecast[1].date.timeIntervalSince(forecast[0].date) == 86400)
         #expect(HAForecast.list(from: response, entityId: "weather.other").isEmpty)
     }
+
+    @Test func parsesEnergyPrefs() throws {
+        let prefs = HAEnergyPrefs(try json(#"""
+        {"energy_sources": [
+           {"type": "grid", "flow_from": [{"stat_energy_from": "sensor.import"}],
+            "flow_to": [{"stat_energy_to": "sensor.export"}]},
+           {"type": "solar", "stat_energy_from": "sensor.solar"},
+           {"type": "gas", "stat_energy_from": "sensor.gas"}],
+         "device_consumption": [{"stat_consumption": "sensor.eir", "name": "Eir"},
+                                {"stat_consumption": "sensor.tyr"}]}
+        """#))
+        #expect(prefs.gridImports == ["sensor.import"])
+        #expect(prefs.gridExports == ["sensor.export"])
+        #expect(prefs.solar == ["sensor.solar"])
+        #expect(prefs.devices.map(\.statistic) == ["sensor.eir", "sensor.tyr"])
+        #expect(prefs.devices[0].name == "Eir")
+        #expect(!prefs.isEmpty)
+        #expect(HAEnergyPrefs(try json(#"{"energy_sources": [], "device_consumption": []}"#)).isEmpty)
+    }
 }

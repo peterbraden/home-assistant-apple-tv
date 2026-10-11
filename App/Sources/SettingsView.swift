@@ -61,7 +61,7 @@ struct SettingsView: View {
                 }
             }
 
-            if !store.dashboards.isEmpty {
+            if store.hasDashboards {
                 Section {
                     Toggle("Keep Dashboards on Screen", isOn: $keepDashboardsAwake)
                 } footer: {

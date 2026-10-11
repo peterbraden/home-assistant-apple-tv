@@ -47,6 +47,8 @@ final class HomeStore {
     private var ranLaunchActions = false
 
     private var socket: HAWebSocketClient?
+    /// What the Energy dashboard tracks; nil when it isn't set up.
+    private(set) var energyPrefs: HAEnergyPrefs?
     /// Assist pipelines on the server and Home Assistant's preferred one.
     private(set) var assistPipelines: [HAAssistPipeline] = []
     private(set) var preferredAssistPipeline: HAAssistPipeline?
@@ -85,6 +87,7 @@ final class HomeStore {
         dashboards = []
         assistPipelines = []
         preferredAssistPipeline = nil
+        energyPrefs = nil
         connectionState = .signedOut
         TVTopShelfContentProvider.topShelfContentDidChange()
     }
@@ -121,16 +124,18 @@ final class HomeStore {
                 let registry = (try? await socket.fetchRegistry()) ?? .empty
                 let dashboards = await loadDashboards(from: socket)
                 let pipelines = try? await socket.fetchPipelines()
+                let energy = (try? await socket.fetchEnergyPrefs()).flatMap { $0.isEmpty ? nil : $0 }
 
                 guard !Task.isCancelled else { await socket.close(); return }
                 self.entities = Dictionary(states.map { ($0.entityId, $0) }, uniquingKeysWith: { _, new in new })
                 self.registry = registry
                 self.dashboards = dashboards
                 self.assistPipelines = pipelines?.pipelines ?? []
+                self.energyPrefs = energy
                 self.preferredAssistPipeline = pipelines?.preferred
                 if selectedTab == .rooms, rooms.isEmpty {
                     // Non-admin users have no Rooms tab.
-                    selectedTab = dashboards.isEmpty ? .devices : .dashboards
+                    selectedTab = dashboards.isEmpty && energy == nil ? .devices : .dashboards
                 }
                 self.socket = socket
                 connectionState = .connected
@@ -385,6 +390,9 @@ final class HomeStore {
 
     // MARK: - Top Shelf
 
+    /// Whether the Dashboards tab has anything to show: Lovelace dashboards or Energy.
+    var hasDashboards: Bool { !dashboards.isEmpty || energyPrefs != nil }
+
     /// Dashboard views that the Top Shelf can show, as (id, title) pairs.
     var topShelfChoices: [(id: String, title: String)] {
         dashboards.flatMap { item in
@@ -402,7 +410,7 @@ final class HomeStore {
     func open(_ url: URL) {
         guard url.scheme == SharedContainer.dashboardsURL.scheme else { return }
         switch url.host() {
-        case "dashboards" where !dashboards.isEmpty: selectedTab = .dashboards
+        case "dashboards" where hasDashboards: selectedTab = .dashboards
         case "media": selectedTab = .media
         case "map" where !locatedEntities.isEmpty: selectedTab = .map
         case "assist": selectedTab = .assist
