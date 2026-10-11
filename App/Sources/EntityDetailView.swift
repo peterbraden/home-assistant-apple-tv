@@ -60,6 +60,10 @@ struct EntityDetailView: View {
         case "alarm_control_panel": AlarmControls(entity: entity)
         case "vacuum": VacuumControls(entity: entity)
         case "scene", "script", "button", "input_button": RunControls(entity: entity)
+        case "automation": AutomationControls(entity: entity)
+        case "select", "input_select": SelectControls(entity: entity)
+        case "number", "input_number": NumberControls(entity: entity)
+        case "update": UpdateControls(entity: entity)
         default: EmptyView()
         }
     }

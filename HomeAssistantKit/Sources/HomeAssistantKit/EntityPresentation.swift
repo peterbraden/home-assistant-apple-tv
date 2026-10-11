@@ -7,6 +7,8 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
     case media
     case security
     case scenes
+    case automations
+    case controls
     case sensors
 
     public var id: String { rawValue }
@@ -18,6 +20,8 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
         case .media: return "Media"
         case .security: return "Security"
         case .scenes: return "Scenes"
+        case .automations: return "Automations"
+        case .controls: return "Controls"
         case .sensors: return "Sensors"
         }
     }
@@ -29,6 +33,8 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
         case .media: return "play.tv.fill"
         case .security: return "lock.shield.fill"
         case .scenes: return "sparkles"
+        case .automations: return "gearshape.2.fill"
+        case .controls: return "slider.horizontal.3"
         case .sensors: return "gauge.with.dots.needle.33percent"
         }
     }
@@ -45,6 +51,10 @@ public enum EntityCategory: String, CaseIterable, Identifiable, Sendable {
             return .security
         case "scene", "script", "button", "input_button":
             return .scenes
+        case "automation":
+            return .automations
+        case "select", "input_select", "number", "input_number", "input_datetime", "input_text":
+            return .controls
         case "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun":
             return .sensors
         default:
@@ -117,6 +127,13 @@ extension HAEntity {
             if let position = attributes["current_position"]?.intValue, state == "open" {
                 return "Open · \(position)%"
             }
+        case "automation":
+            return state == "on" ? "Enabled" : "Disabled"
+        case "update":
+            if state == "on", let latest = attributes["latest_version"]?.stringValue {
+                return "Update to \(latest)"
+            }
+            return state == "off" ? "Up to date" : Self.humanize(state)
         case "binary_sensor":
             return binarySensorState
         case "sensor":
@@ -171,6 +188,12 @@ extension HAEntity {
         case "script": return "scroll.fill"
         case "button", "input_button": return "button.programmable"
         case "vacuum": return "fan.ceiling.fill"
+        case "automation": return on ? "gearshape.2.fill" : "gearshape.2"
+        case "select", "input_select": return "list.bullet.circle"
+        case "number", "input_number": return "number.circle"
+        case "input_datetime": return "calendar.badge.clock"
+        case "input_text": return "character.cursor.ibeam"
+        case "update": return on ? "arrow.down.circle.fill" : "checkmark.circle"
         case "person": return state == "home" ? "person.fill.checkmark" : "person.fill"
         case "device_tracker": return "location.fill"
         case "sun": return state == "above_horizon" ? "sun.max.fill" : "moon.stars.fill"
@@ -227,7 +250,7 @@ extension HAEntity {
         unit == "%" || unit.hasPrefix("°") ? "" : " "
     }
 
-    static func format(_ value: Double) -> String {
+    public static func format(_ value: Double) -> String {
         if value.rounded() == value, abs(value) < 1e9 {
             return String(Int(value))
         }

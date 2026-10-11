@@ -59,7 +59,7 @@ public struct HAForecast: Sendable, Hashable, Identifiable {
     public var id: Date { date }
 
     public init?(_ json: JSONValue) {
-        guard let text = json["datetime"]?.stringValue, let date = HAForecast.parseDate(text) else { return nil }
+        guard let text = json["datetime"]?.stringValue, let date = HADate.parse(text) else { return nil }
         self.date = date
         condition = json["condition"]?.stringValue
         temperature = json["temperature"]?.doubleValue
@@ -74,8 +74,11 @@ public struct HAForecast: Sendable, Hashable, Identifiable {
     public static func list(from response: JSONValue, entityId: String) -> [HAForecast] {
         (response[entityId]?["forecast"]?.arrayValue ?? []).compactMap(HAForecast.init)
     }
+}
 
-    static func parseDate(_ text: String) -> Date? {
+/// Parses Home Assistant's ISO 8601 timestamps, with or without fractional seconds.
+public enum HADate {
+    public static func parse(_ text: String) -> Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = formatter.date(from: text) { return date }

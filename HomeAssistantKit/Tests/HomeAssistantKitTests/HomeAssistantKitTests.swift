@@ -47,6 +47,23 @@ import Testing
         #expect(entity.category == .lights)
     }
 
+    @Test func automationsControlsAndUpdates() {
+        let automation = HAEntity(entityId: "automation.motion", state: "off")
+        #expect(automation.category == .automations)
+        #expect(automation.displayState == "Disabled")
+        #expect(automation.primaryAction == .showDetails)
+
+        let select = HAEntity(entityId: "select.mode", state: "eco", attributes: ["options": ["eco", "boost"]])
+        #expect(select.category == .controls)
+        #expect(select.primaryAction == .showDetails)
+        #expect(HAEntity(entityId: "number.volume", state: "3").category == .controls)
+
+        let update = HAEntity(entityId: "update.core", state: "on", attributes: ["latest_version": "2026.10.2"])
+        #expect(update.displayState == "Update to 2026.10.2")
+        #expect(update.category == nil)
+        #expect(HAEntity(entityId: "update.core", state: "off").displayState == "Up to date")
+    }
+
     @Test func fallbackNameFromObjectId() {
         let entity = HAEntity(entityId: "switch.coffee_maker", state: "off")
         #expect(entity.friendlyName == "Coffee Maker")

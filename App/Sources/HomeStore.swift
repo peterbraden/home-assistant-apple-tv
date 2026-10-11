@@ -340,14 +340,16 @@ final class HomeStore {
     var presentedEntity: EntitySelection?
 
     /// Opens a `homeassistanttv://` link: `dashboards`, `media`, `assist`, `devices`,
-    /// `settings`, or `entity/<entity_id>` to show an entity's details.
+    /// `settings`, `devices/<category>`, or `entity/<entity_id>` to show an entity's details.
     func open(_ url: URL) {
         guard url.scheme == SharedContainer.dashboardsURL.scheme else { return }
         switch url.host() {
         case "dashboards" where !dashboards.isEmpty: selectedTab = .dashboards
         case "media": selectedTab = .media
         case "assist": selectedTab = .assist
-        case "devices": selectedTab = .devices
+        case "devices":
+            selectedTab = .devices
+            if let category = EntityCategory(rawValue: url.lastPathComponent) { selectedCategory = category }
         case "settings": selectedTab = .settings
         case "entity":
             let id = url.lastPathComponent
@@ -386,6 +388,13 @@ final class HomeStore {
             return (rank(a.element), a.offset) < (rank(b.element), b.offset)
         }
         return ranked.prefix(40).map(\.element)
+    }
+
+    /// Update entities with a new version waiting.
+    var pendingUpdates: [HAEntity] {
+        entities.values
+            .filter { $0.domain == "update" && $0.state == "on" }
+            .sorted { $0.friendlyName.localizedCaseInsensitiveCompare($1.friendlyName) == .orderedAscending }
     }
 
     func entities(in category: EntityCategory) -> [HAEntity] {

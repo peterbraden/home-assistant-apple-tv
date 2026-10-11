@@ -20,6 +20,18 @@ struct SettingsView: View {
                 LabeledContent("Entities", value: "\(store.entities.count)")
             }
 
+            if !store.pendingUpdates.isEmpty {
+                Section("Updates") {
+                    ForEach(store.pendingUpdates) { update in
+                        Button {
+                            store.presentedEntity = EntitySelection(id: update.entityId)
+                        } label: {
+                            LabeledContent(update.friendlyName, value: update.displayState)
+                        }
+                    }
+                }
+            }
+
             if store.assistPipelines.count > 1 {
                 Section {
                     Picker("Assist", selection: $assistPipeline) {
