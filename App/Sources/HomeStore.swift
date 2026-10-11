@@ -8,7 +8,7 @@ import TVServices
 @Observable
 final class HomeStore {
     enum Tab: Hashable {
-        case rooms, dashboards, media, assist, devices, settings
+        case rooms, dashboards, media, map, assist, devices, settings
     }
 
     enum ConnectionState: Equatable {
@@ -339,13 +339,14 @@ final class HomeStore {
     /// An entity whose details are shown over everything, e.g. from a link.
     var presentedEntity: EntitySelection?
 
-    /// Opens a `homeassistanttv://` link: `dashboards`, `media`, `assist`, `devices`,
+    /// Opens a `homeassistanttv://` link: `dashboards`, `media`, `map`, `assist`, `devices`,
     /// `settings`, `devices/<category>`, or `entity/<entity_id>` to show an entity's details.
     func open(_ url: URL) {
         guard url.scheme == SharedContainer.dashboardsURL.scheme else { return }
         switch url.host() {
         case "dashboards" where !dashboards.isEmpty: selectedTab = .dashboards
         case "media": selectedTab = .media
+        case "map" where !locatedEntities.isEmpty: selectedTab = .map
         case "assist": selectedTab = .assist
         case "devices":
             selectedTab = .devices

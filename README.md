@@ -16,10 +16,11 @@ A native tvOS app (SwiftUI, tvOS 17+) for controlling Home Assistant from the co
   - Covers/valves, locks, alarm panels (with code entry), vacuums, fans
 - **Top Shelf** – when the app is highlighted in the top row of the Home screen, the background shows live graphs from a dashboard view (chosen in Settings; by default the first view with graphs). Drawn by a Top Shelf extension that shares the sign-in through an App Group.
 - **Media tab** – browse every Home Assistant media source (Radio Browser, local media, cameras, Jellyfin, DLNA, Synology Photos, TTS…) and the libraries of speakers and TVs. Select plays on the Apple TV itself through the system player (Siri Remote controls, Now Playing, Picture in Picture for video; audio keeps playing in the background). Long-press to send an item to a Home Assistant media player; playing from a speaker's own library asks first.
+- **Map tab** – people (with their pictures) and device trackers not assigned to a person, on Apple Maps with your zones drawn as circles; a side list shows who is where and since when. Shown only when something reports a location.
 - **Assist** – search devices, or send the same words to Home Assistant Assist (hold the Siri Remote mic to dictate). Text only goes to Assist when you press "Ask Assist", so searching for a device never operates it. The agent defaults to the preferred pipeline and can be changed in Settings.
 - **Entity details** – besides controls: a 24-hour graph for numeric sensors, recent logbook activity (with what caused each change) for everything else, and a daily forecast for weather entities.
 - **Automations, selects, numbers and updates** – enable, disable or run automations; pick options and step numbers (including `input_*` helpers); pending updates are listed in Settings and install after confirmation.
-- **Links** – `homeassistanttv://entity/<entity_id>` opens an entity's details; `dashboards`, `media`, `assist`, `devices` and `settings` open those tabs.
+- **Links** – `homeassistanttv://entity/<entity_id>` opens an entity's details; `dashboards`, `media`, `map`, `assist`, `devices[/<category>]` and `settings` open those tabs.
 - **Keep dashboards on screen** – optional setting that holds off the screen saver while a dashboard is showing.
 - **Cameras** – live HLS stream (needs the `stream` integration), falling back to 1-second snapshots.
 - **Server discovery** via Bonjour, so you rarely need to type the address.

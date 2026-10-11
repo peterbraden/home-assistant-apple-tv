@@ -24,6 +24,11 @@ struct HomeTabView: View {
                     MediaTab()
                         .tabItem { Label("Media", systemImage: "play.rectangle.fill") }
                         .tag(HomeStore.Tab.media)
+                    if !store.locatedEntities.isEmpty {
+                        MapTab()
+                            .tabItem { Label("Map", systemImage: "map.fill") }
+                            .tag(HomeStore.Tab.map)
+                    }
                     AssistView()
                         .tabItem { Label("Assist", systemImage: "waveform") }
                         .tag(HomeStore.Tab.assist)
@@ -116,7 +121,8 @@ private struct StatusBanner: View {
 }
 
 /// Every entity by category, with a row of category buttons at the top.
-/// One tab for all categories keeps the tab bar within tvOS's limit of 7 tabs.
+/// One tab for all categories keeps the tab bar within tvOS's limit of 7 tabs:
+/// Rooms, Dashboards, Media, Map, Assist, Devices and Settings.
 private struct DevicesView: View {
     @Environment(HomeStore.self) private var store
 
