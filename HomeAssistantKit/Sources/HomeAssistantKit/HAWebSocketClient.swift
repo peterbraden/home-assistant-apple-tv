@@ -208,6 +208,27 @@ public actor HAWebSocketClient {
         return HAConversationResponse(try await send(command: "conversation/process", fields))
     }
 
+    /// Logbook entries for the given entities, oldest first.
+    public func fetchLogbook(entityIds: [String], start: Date) async throws -> [HALogbookEntry] {
+        HALogbookEntry.list(from: try await send(command: "logbook/get_events", [
+            "start_time": .string(HAHistoryParser.isoString(start)),
+            "entity_ids": .array(entityIds.map { .string($0) }),
+        ]))
+    }
+
+    /// The weather entity's forecast; `type` is "daily", "hourly" or "twice_daily".
+    /// Uses the read-only `weather.get_forecasts` action.
+    public func fetchForecast(entityId: String, type: String = "daily") async throws -> [HAForecast] {
+        let result = try await send(command: "call_service", [
+            "domain": "weather",
+            "service": "get_forecasts",
+            "service_data": ["type": .string(type)],
+            "target": ["entity_id": .string(entityId)],
+            "return_response": true,
+        ])
+        return HAForecast.list(from: result["response"] ?? .null, entityId: entityId)
+    }
+
     /// Browses media sources (local media, radio, cameras, Jellyfin…). nil is the root.
     public func browseMediaSource(_ contentId: String?) async throws -> HAMediaItem {
         var fields: [String: JSONValue] = [:]

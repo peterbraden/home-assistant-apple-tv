@@ -40,6 +40,9 @@ struct HomeTabView: View {
 
             StatusBanner()
         }
+        .sheet(item: $store.presentedEntity) { selection in
+            EntityDetailView(entityId: selection.id).environment(store)
+        }
         .fullScreenCover(isPresented: Binding(
             get: { store.playback.isPlayerPresented },
             set: { if !$0 { store.playback.playerDismissed() } }

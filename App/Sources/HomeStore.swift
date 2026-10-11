@@ -238,6 +238,16 @@ final class HomeStore {
             text, conversationId: conversationId, agentId: pipeline?.conversationEngine, language: language)
     }
 
+    func logbook(for entityId: String, since start: Date) async throws -> [HALogbookEntry] {
+        guard let socket else { throw HAError.disconnected }
+        return try await socket.fetchLogbook(entityIds: [entityId], start: start)
+    }
+
+    func forecast(for entityId: String) async throws -> [HAForecast] {
+        guard let socket else { throw HAError.disconnected }
+        return try await socket.fetchForecast(entityId: entityId)
+    }
+
     // MARK: - Media
 
     func browseMedia(_ location: MediaLocation) async throws -> HAMediaItem {
@@ -288,10 +298,14 @@ final class HomeStore {
     }
 
     #if DEBUG
-    /// Lets the simulator open a media folder (`MEDIA_PATH`) or play a media-source ID
-    /// on the Apple TV (`MEDIA_PLAY`, `MEDIA_TITLE`) without pressing select in UI tests.
+    /// Lets the simulator follow a link (`OPEN_URL`), open a media folder (`MEDIA_PATH`) or
+    /// play a media-source ID on the Apple TV (`MEDIA_PLAY`, `MEDIA_TITLE`) without pressing
+    /// select in UI tests or confirming the system's "Open in…" prompt.
     private func runDebugLaunchActions() async {
         let environment = ProcessInfo.processInfo.environment
+        if let link = environment["OPEN_URL"].flatMap(URL.init(string:)) {
+            open(link)
+        }
         if let folder = environment["MEDIA_PATH"] {
             selectedTab = .media
             mediaPath = folder == "root" ? [] : [.source(folder)]
@@ -322,10 +336,23 @@ final class HomeStore {
         }
     }
 
-    /// Opens a URL from the Top Shelf.
+    /// An entity whose details are shown over everything, e.g. from a link.
+    var presentedEntity: EntitySelection?
+
+    /// Opens a `homeassistanttv://` link: `dashboards`, `media`, `assist`, `devices`,
+    /// `settings`, or `entity/<entity_id>` to show an entity's details.
     func open(_ url: URL) {
-        if url == SharedContainer.dashboardsURL, !dashboards.isEmpty {
-            selectedTab = .dashboards
+        guard url.scheme == SharedContainer.dashboardsURL.scheme else { return }
+        switch url.host() {
+        case "dashboards" where !dashboards.isEmpty: selectedTab = .dashboards
+        case "media": selectedTab = .media
+        case "assist": selectedTab = .assist
+        case "devices": selectedTab = .devices
+        case "settings": selectedTab = .settings
+        case "entity":
+            let id = url.lastPathComponent
+            if entities[id] != nil { presentedEntity = EntitySelection(id: id) }
+        default: break
         }
     }
 

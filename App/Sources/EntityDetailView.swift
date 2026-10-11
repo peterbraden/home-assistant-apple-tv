@@ -14,6 +14,15 @@ struct EntityDetailView: View {
                 VStack(alignment: .leading, spacing: 50) {
                     header(entity)
                     controls(for: entity)
+                    if entity.domain == "weather" {
+                        ForecastRow(entity: entity)
+                    }
+                    // The logbook leaves out numeric sensors; they get a graph instead.
+                    if entity.domain == "sensor", entity.unit != nil, Double(entity.state) != nil {
+                        SensorHistoryChart(entity: entity)
+                    } else if !["weather", "sun"].contains(entity.domain) {
+                        ActivityList(entity: entity)
+                    }
                     AttributeList(entity: entity)
                 }
                 .padding(60)

@@ -239,7 +239,7 @@ extension HAEntity {
         return text.prefix(1).uppercased() + text.dropFirst()
     }
 
-    static func weatherSymbol(_ state: String) -> String {
+    public static func weatherSymbol(_ state: String) -> String {
         switch state {
         case "sunny": return "sun.max.fill"
         case "clear-night": return "moon.stars.fill"

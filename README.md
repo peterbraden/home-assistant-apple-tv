@@ -17,6 +17,8 @@ A native tvOS app (SwiftUI, tvOS 17+) for controlling Home Assistant from the co
 - **Top Shelf** – when the app is highlighted in the top row of the Home screen, the background shows live graphs from a dashboard view (chosen in Settings; by default the first view with graphs). Drawn by a Top Shelf extension that shares the sign-in through an App Group.
 - **Media tab** – browse every Home Assistant media source (Radio Browser, local media, cameras, Jellyfin, DLNA, Synology Photos, TTS…) and the libraries of speakers and TVs. Select plays on the Apple TV itself through the system player (Siri Remote controls, Now Playing, Picture in Picture for video; audio keeps playing in the background). Long-press to send an item to a Home Assistant media player; playing from a speaker's own library asks first.
 - **Assist** – search devices, or send the same words to Home Assistant Assist (hold the Siri Remote mic to dictate). Text only goes to Assist when you press "Ask Assist", so searching for a device never operates it. The agent defaults to the preferred pipeline and can be changed in Settings.
+- **Entity details** – besides controls: a 24-hour graph for numeric sensors, recent logbook activity (with what caused each change) for everything else, and a daily forecast for weather entities.
+- **Links** – `homeassistanttv://entity/<entity_id>` opens an entity's details; `dashboards`, `media`, `assist`, `devices` and `settings` open those tabs.
 - **Keep dashboards on screen** – optional setting that holds off the screen saver while a dashboard is showing.
 - **Cameras** – live HLS stream (needs the `stream` integration), falling back to 1-second snapshots.
 - **Server discovery** via Bonjour, so you rarely need to type the address.
@@ -76,7 +78,7 @@ SIMCTL_CHILD_HA_URL=http://homeassistant.local:8123 SIMCTL_CHILD_HA_TOKEN="$(pbp
 
 Add `SIMCTL_CHILD_HA_AUTOCONNECT=1` to sign in straight away instead of choosing Connect.
 
-To test media without pressing select, `SIMCTL_CHILD_MEDIA_PATH=<media-source ID>` (or `root`) opens the Media tab at that folder, and `SIMCTL_CHILD_MEDIA_PLAY=<media-source ID>` (with optional `SIMCTL_CHILD_MEDIA_TITLE`) plays it on the Apple TV.
+To test without pressing select, `SIMCTL_CHILD_OPEN_URL=<homeassistanttv:// link>` follows a link at launch; `SIMCTL_CHILD_MEDIA_PATH=<media-source ID>` (or `root`) opens the Media tab at that folder, and `SIMCTL_CHILD_MEDIA_PLAY=<media-source ID>` (with optional `SIMCTL_CHILD_MEDIA_TITLE`) plays it on the Apple TV.
 
 Grouping by room reads the area, device and entity registries, which needs an **admin** user. With a non-admin token the app still works, but without the Rooms tab.
 
