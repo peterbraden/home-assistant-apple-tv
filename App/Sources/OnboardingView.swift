@@ -1,3 +1,4 @@
+import CoreImage.CIFilterBuiltins
 import HomeAssistantKit
 import SwiftUI
 
@@ -11,9 +12,9 @@ struct OnboardingView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 80) {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 20) {
                 Image(systemName: "house.fill")
-                    .font(.system(size: 120))
+                    .font(.system(size: 80))
                     .foregroundStyle(.tint)
                 Text("Home Assistant")
                     .font(.largeTitle.bold())
@@ -34,7 +35,23 @@ struct OnboardingView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 24)
+                .padding(.top, 12)
+
+                // Once the address is known, a QR code opens the token page on a phone.
+                if let securityURL, let code = QRCode.image(for: securityURL.absoluteString) {
+                    HStack(spacing: 30) {
+                        Image(uiImage: code)
+                            .interpolation(.none)
+                            .resizable()
+                            .frame(width: 170, height: 170)
+                            .padding(12)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        Text("Scan with your phone to open Profile → Security on \(securityURL.host() ?? "your server").")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 8)
+                }
             }
             .frame(maxWidth: 700, alignment: .leading)
 
@@ -95,12 +112,17 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: 800)
         }
-        .padding(80)
+        .padding(.horizontal, 80)
+        .padding(.vertical, 50)
         .onAppear {
             discovery.start()
             prefillFromEnvironment()
         }
         .onDisappear { discovery.stop() }
+    }
+
+    private var securityURL: URL? {
+        HAServerConfig.normalizedURL(from: address).map { $0.appending(path: "profile/security") }
     }
 
     /// Debug builds read `HA_URL` and `HA_TOKEN` from the launch environment, so the
@@ -127,5 +149,17 @@ struct OnboardingView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+}
+
+enum QRCode {
+    /// A QR code for `text`, one pixel per module; scale it up with `.interpolation(.none)`.
+    static func image(for text: String) -> UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(text.utf8)
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage,
+              let cgImage = CIContext().createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
