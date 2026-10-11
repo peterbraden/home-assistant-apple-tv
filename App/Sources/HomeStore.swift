@@ -223,6 +223,28 @@ final class HomeStore {
         }
     }
 
+    /// The text-to-speech engine for announcements: one that has been used before
+    /// (its state is the time it last spoke), preferring a local one.
+    var announcementEngine: HAEntity? {
+        let engines = entities.values.filter { $0.domain == "tts" }
+            .sorted { $0.entityId < $1.entityId }
+        return engines.first { !$0.isUnavailable && $0.entityId.contains("piper") }
+            ?? engines.first { !$0.isUnavailable }
+            ?? engines.first
+    }
+
+    /// Speaks `message` on a media player through text-to-speech.
+    func announce(_ message: String, on player: HAEntity) {
+        guard let engine = announcementEngine else {
+            actionError = "No text-to-speech engine is set up in Home Assistant."
+            return
+        }
+        call("tts", "speak", on: engine, data: [
+            "media_player_entity_id": .string(player.entityId),
+            "message": .string(message),
+        ])
+    }
+
     /// Locks that can be opened from the doorbell alert.
     var doorLocks: [HAEntity] {
         visibleEntities.filter { $0.domain == "lock" && !$0.isUnavailable }

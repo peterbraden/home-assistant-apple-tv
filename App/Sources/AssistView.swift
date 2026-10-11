@@ -11,6 +11,7 @@ struct AssistView: View {
     @State private var exchanges: [Exchange] = []
     @State private var conversationId: String?
     @State private var isAsking = false
+    @State private var announcing = false
 
     struct Exchange: Identifiable {
         let id = UUID()
@@ -29,12 +30,23 @@ struct AssistView: View {
             ) {
                 VStack(alignment: .leading, spacing: 30) {
                     if !trimmed.isEmpty {
-                        Button {
-                            ask(trimmed)
-                        } label: {
-                            Label("Ask Assist: “\(trimmed)”", systemImage: "waveform")
+                        HStack(spacing: 30) {
+                            Button {
+                                ask(trimmed)
+                            } label: {
+                                Label("Ask Assist: “\(trimmed)”", systemImage: "waveform")
+                            }
+                            .disabled(isAsking)
+                            if store.announcementEngine != nil, !store.mediaTargets.isEmpty {
+                                Button("Announce…", systemImage: "megaphone.fill") { announcing = true }
+                            }
                         }
-                        .disabled(isAsking)
+                        .confirmationDialog("Say “\(trimmed)” on…", isPresented: $announcing) {
+                            ForEach(store.mediaTargets) { player in
+                                Button(player.friendlyName) { store.announce(trimmed, on: player) }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        }
                     } else if exchanges.isEmpty {
                         Text("Search for a device, or ask Home Assistant to do something, like “turn off the lights” or “what's the temperature outside?”. Hold the mic button on the remote to dictate.")
                             .font(.callout)
