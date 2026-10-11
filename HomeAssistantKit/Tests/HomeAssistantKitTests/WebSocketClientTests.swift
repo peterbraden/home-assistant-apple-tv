@@ -109,6 +109,25 @@ private final class FakeHomeAssistant: @unchecked Sendable {
             result([["entity_id": "light.kitchen", "device_id": "d1", "area_id": .null]])
         case "camera/stream":
             result(["url": "/api/hls/abc/master_playlist.m3u8"])
+        case "persistent_notification/subscribe":
+            result(.null)
+            send([
+                "id": id, "type": "event",
+                "event": ["type": "current", "notifications": [
+                    "n1": ["notification_id": "n1", "title": "Hello", "message": "First",
+                           "created_at": "2026-10-10T10:00:00.123456+00:00"],
+                ]],
+            ], on: connection)
+            send([
+                "id": id, "type": "event",
+                "event": ["type": "added", "notifications": [
+                    "n2": ["notification_id": "n2", "title": .null, "message": "Second"],
+                ]],
+            ], on: connection)
+            send([
+                "id": id, "type": "event",
+                "event": ["type": "removed", "notifications": ["n1": ["notification_id": "n1"]]],
+            ], on: connection)
         default:
             send([
                 "id": id, "type": "result", "success": false,
@@ -158,6 +177,31 @@ private final class FakeHomeAssistant: @unchecked Sendable {
         let change = await iterator.next()
         #expect(change?.entityId == "light.kitchen")
         #expect(change?.newState?.state == "on")
+
+        await client.close()
+        #expect(await iterator.next() == nil)
+    }
+
+    @Test func subscriptionsReceiveTheirEvents() async throws {
+        let (server, url) = try await makeServer()
+        defer { server.stop() }
+
+        let client = HAWebSocketClient(config: HAServerConfig(baseURL: url, accessToken: FakeHomeAssistant.token))
+        try await client.connect()
+        let events = try await client.subscribe("persistent_notification/subscribe")
+        var iterator = events.makeAsyncIterator()
+
+        var notifications: [String: HAPersistentNotification] = [:]
+        #expect(HAPersistentNotification.apply(try #require(await iterator.next()), to: &notifications).isEmpty)
+        #expect(notifications["n1"]?.title == "Hello")
+        #expect(notifications["n1"]?.createdAt != nil)
+
+        let added = HAPersistentNotification.apply(try #require(await iterator.next()), to: &notifications)
+        #expect(added.map(\.message) == ["Second"])
+        #expect(notifications.count == 2)
+
+        HAPersistentNotification.apply(try #require(await iterator.next()), to: &notifications)
+        #expect(notifications.keys.sorted() == ["n2"])
 
         await client.close()
         #expect(await iterator.next() == nil)

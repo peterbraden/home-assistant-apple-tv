@@ -34,6 +34,14 @@ final class HomeStore {
     var actionError: String?
     /// Media playing on the Apple TV itself.
     let playback = MediaPlayback()
+    /// Home Assistant's persistent notifications, by ID.
+    private(set) var notifications: [String: HAPersistentNotification] = [:]
+    /// A notification that arrived while the app was open, shown briefly as a banner.
+    var notificationBanner: HAPersistentNotification?
+    /// A doorbell that just rang.
+    var doorbellAlert: DoorbellAlert?
+    /// A camera shown full screen over everything, e.g. from the doorbell alert.
+    var presentedCamera: EntitySelection?
     /// Folders open in the Media tab.
     var mediaPath: [MediaLocation] = []
     private var ranLaunchActions = false
@@ -104,6 +112,10 @@ final class HomeStore {
                 try await socket.connect()
                 // Subscribe before fetching so no changes are missed in between.
                 try await socket.subscribeToStateChanges()
+                // Optional: only admins can subscribe to notifications.
+                if let events = try? await socket.subscribe("persistent_notification/subscribe") {
+                    Task { await self.receiveNotifications(events) }
+                }
                 let states = try await socket.fetchStates()
                 // Registries are optional: they need an admin user.
                 let registry = (try? await socket.fetchRegistry()) ?? .empty
@@ -170,11 +182,49 @@ final class HomeStore {
     }
 
     private func apply(_ change: HAStateChange) {
+        if let newState = change.newState, let old = entities[change.entityId],
+           newState.domain == "event", newState.deviceClass == "doorbell",
+           newState.state != old.state, !newState.isUnavailable, !old.isUnavailable {
+            // An event entity's state is the time it last fired.
+            doorbellAlert = DoorbellAlert(entityId: change.entityId, name: newState.friendlyName)
+        }
         if let newState = change.newState {
             entities[change.entityId] = newState
         } else {
             entities.removeValue(forKey: change.entityId)
         }
+    }
+
+    private func receiveNotifications(_ events: AsyncStream<JSONValue>) async {
+        for await event in events {
+            let new = HAPersistentNotification.apply(event, to: &notifications)
+            if let latest = new.last { notificationBanner = latest }
+        }
+    }
+
+    var sortedNotifications: [HAPersistentNotification] {
+        notifications.values.sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+    }
+
+    func dismissNotification(_ notification: HAPersistentNotification) {
+        guard let client else { return }
+        Task {
+            do {
+                try await client.callService(domain: "persistent_notification", service: "dismiss",
+                                             data: ["notification_id": .string(notification.id)])
+            } catch {
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Locks that can be opened from the doorbell alert.
+    var doorLocks: [HAEntity] {
+        visibleEntities.filter { $0.domain == "lock" && !$0.isUnavailable }
+    }
+
+    var availableCameras: [HAEntity] {
+        visibleEntities.filter { $0.domain == "camera" && !$0.isUnavailable }
     }
 
     // MARK: - Actions
@@ -303,6 +353,14 @@ final class HomeStore {
     /// select in UI tests or confirming the system's "Open in…" prompt.
     private func runDebugLaunchActions() async {
         let environment = ProcessInfo.processInfo.environment
+        if let doorbell = environment["SIMULATE_DOORBELL"], let entity = entities[doorbell] {
+            doorbellAlert = DoorbellAlert(entityId: doorbell, name: entity.friendlyName)
+        }
+        if let message = environment["SIMULATE_NOTIFICATION"] {
+            notificationBanner = HAPersistentNotification([
+                "notification_id": "debug", "title": "Test notification", "message": .string(message),
+            ])
+        }
         if let link = environment["OPEN_URL"].flatMap(URL.init(string:)) {
             open(link)
         }
@@ -423,6 +481,13 @@ final class HomeStore {
     func entity(_ id: String) -> HAEntity? {
         entities[id]
     }
+}
+
+struct DoorbellAlert: Identifiable, Equatable {
+    let id = UUID()
+    let entityId: String
+    let name: String
+    let time = Date()
 }
 
 /// A place in a media tree: Home Assistant's media sources, or a player's own library.

@@ -20,6 +20,22 @@ struct SettingsView: View {
                 LabeledContent("Entities", value: "\(store.entities.count)")
             }
 
+            if !store.notifications.isEmpty {
+                Section("Notifications") {
+                    ForEach(store.sortedNotifications) { notification in
+                        Button {
+                            store.dismissNotification(notification)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(notification.title ?? "Notification").font(.headline)
+                                Text(notification.message).font(.callout).foregroundStyle(.secondary).lineLimit(3)
+                                Text("Select to dismiss").font(.caption).foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                }
+            }
+
             if !store.pendingUpdates.isEmpty {
                 Section("Updates") {
                     ForEach(store.pendingUpdates) { update in

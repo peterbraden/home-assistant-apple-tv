@@ -44,9 +44,13 @@ struct HomeTabView: View {
             }
 
             StatusBanner()
+            AlertsOverlay()
         }
         .sheet(item: $store.presentedEntity) { selection in
             EntityDetailView(entityId: selection.id).environment(store)
+        }
+        .fullScreenCover(item: $store.presentedCamera) { selection in
+            CameraView(entityId: selection.id).environment(store)
         }
         .fullScreenCover(isPresented: Binding(
             get: { store.playback.isPlayerPresented },

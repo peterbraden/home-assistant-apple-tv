@@ -37,6 +37,8 @@ public actor HAWebSocketClient {
     private var nextID = 1
     private var pending: [Int: CheckedContinuation<JSONValue, Error>] = [:]
     private var stateSubscriptionID: Int?
+    /// Other subscriptions, by command ID: each gets its events' payloads.
+    private var subscriptions: [Int: AsyncStream<JSONValue>.Continuation] = [:]
     private var isClosed = false
     /// The most recent outgoing send. Each send waits for the previous one so
     /// messages leave in ID order; Home Assistant rejects IDs that go backwards.
@@ -87,6 +89,8 @@ public actor HAWebSocketClient {
         }
         pending.removeAll()
         stateContinuation.finish()
+        subscriptions.values.forEach { $0.finish() }
+        subscriptions.removeAll()
     }
 
     /// Sends a command and returns its `result` payload.
@@ -124,6 +128,22 @@ public actor HAWebSocketClient {
             stateSubscriptionID = nil
             throw error
         }
+    }
+
+    /// Runs a subscription command (e.g. `persistent_notification/subscribe`) and
+    /// returns the `event` payloads it sends. The stream ends when the connection closes.
+    public func subscribe(_ type: String, _ fields: [String: JSONValue] = [:]) async throws -> AsyncStream<JSONValue> {
+        // Register before sending, so an event that follows the result straight away isn't lost.
+        let id = nextID
+        let (stream, continuation) = AsyncStream<JSONValue>.makeStream(bufferingPolicy: .unbounded)
+        subscriptions[id] = continuation
+        do {
+            try await send(command: type, fields)
+        } catch {
+            subscriptions.removeValue(forKey: id)?.finish()
+            throw error
+        }
+        return stream
     }
 
     public func fetchStates() async throws -> [HAEntity] {
@@ -297,6 +317,10 @@ public actor HAWebSocketClient {
                 ))
             }
         case "event":
+            if let id, let subscription = subscriptions[id] {
+                subscription.yield(message["event"] ?? .null)
+                return
+            }
             guard id == stateSubscriptionID,
                   let data = message["event"]?["data"],
                   let change = HAStateChange(eventData: data)
